@@ -478,7 +478,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                       <h3 className="academic-title font-bold text-[8pt] uppercase tracking-widest text-gray-400 mb-3 border-b border-gray-200 pb-1">Core Vocabulary</h3>
                       <div className="space-y-2">
                         {page.vocabs.map(v => (
-                          <div key={v.id} className="bg-white border-l-[3px] border-[#333] p-2 rounded shadow-sm">
+                          <div key={v.id} className="bg-white border-l-[3px] p-2 rounded shadow-sm" style={{ borderLeftColor: v.color || '#333' }}>
                             <div className="academic-body font-bold text-[9.5pt] text-gray-900">{v.word}</div>
                             <div className="academic-title text-[7.5pt] text-gray-600 mt-1 leading-tight">{v.definition}</div>
                           </div>
@@ -492,7 +492,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                       <h3 className="academic-title font-bold text-[8pt] uppercase tracking-widest text-gray-400 mb-3 border-b border-gray-200 pb-1">Annotations</h3>
                       <div className="space-y-2">
                         {page.notes.map(n => (
-                          <div key={n.id} className="bg-white p-2 rounded shadow-sm border border-gray-100">
+                          <div key={n.id} className="bg-white p-2 rounded shadow-sm border border-gray-100 border-l-[3px]" style={{ borderLeftColor: n.color || '#333' }}>
                             <div className="academic-body text-[7.5pt] text-gray-500 italic mb-1 line-clamp-2">"{n.text}"</div>
                             <div className="academic-title text-[8.5pt] text-gray-900 leading-tight">{n.comment}</div>
                           </div>

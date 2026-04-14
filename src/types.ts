@@ -15,6 +15,7 @@ export interface Vocabulary {
   definition: string;
   context: string;
   paragraphIndex?: number;
+  color?: string;
 }
 
 export interface Note {
@@ -22,6 +23,7 @@ export interface Note {
   text: string;
   comment: string;
   paragraphIndex?: number;
+  color?: string;
 }
 
 export type AppMode = 'input' | 'read' | 'layout';
