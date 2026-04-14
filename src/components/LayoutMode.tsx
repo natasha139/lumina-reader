@@ -225,9 +225,10 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-6">
         <div className="col-span-8 overflow-hidden" style={{ columnCount: 2, columnGap: '15px', textAlign: 'justify' }}>
           {page.paragraphs.map((p) => (
-            <div key={p.originalIndex} className="mb-4 break-inside-avoid" style={{ breakInside: 'avoid', orphans: 3, widows: 3 }}>
-              <RichTextParagraph className="rich-text-content academic-body text-[10.5pt] leading-relaxed text-gray-900 outline-none" html={p.en} onChange={(h) => handleEnEdit(p.originalIndex, h)} />
-              {p.zh && <RichTextParagraph className="rich-text-content academic-title text-[8pt] leading-snug text-gray-500 mt-1 outline-none" html={p.zh} onChange={(h) => handleZhEdit(p.originalIndex, h)} />}
+            <div key={p.originalIndex} className="mb-4 break-inside-avoid relative" style={{ breakInside: 'avoid', orphans: 3, widows: 3 }}>
+              <span className="academic-title text-[7pt] text-gray-300 font-bold absolute -left-0 top-0 select-none" style={{ marginLeft: '-2px' }}>{p.originalIndex + 1}</span>
+              <RichTextParagraph className="rich-text-content academic-body text-[10.5pt] leading-relaxed text-gray-900 outline-none pl-3" html={p.en} onChange={(h) => handleEnEdit(p.originalIndex, h)} />
+              {p.zh && <RichTextParagraph className="rich-text-content academic-title text-[8pt] leading-snug text-gray-500 mt-1 outline-none pl-3" html={p.zh} onChange={(h) => handleZhEdit(p.originalIndex, h)} />}
             </div>
           ))}
         </div>
@@ -306,21 +307,22 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-8">
         <div className="col-span-8 overflow-hidden" style={{ columnCount: 2, columnGap: '20px', textAlign: 'justify' }}>
           {page.paragraphs.map((p) => (
-            <div key={p.originalIndex} className="mb-5 break-inside-avoid" style={{ breakInside: 'avoid', orphans: 3, widows: 3 }}>
-              <RichTextParagraph className="rich-text-content editorial-serif text-[10.5pt] leading-[1.9] text-[#2a2a2a] outline-none" html={p.en} onChange={(h) => handleEnEdit(p.originalIndex, h)} />
-              {p.zh && <RichTextParagraph className="rich-text-content text-[8pt] leading-snug text-gray-400 mt-2 outline-none" style={{ fontFamily: 'sans-serif' }} html={p.zh} onChange={(h) => handleZhEdit(p.originalIndex, h)} />}
+            <div key={p.originalIndex} className="mb-5 break-inside-avoid relative" style={{ breakInside: 'avoid', orphans: 3, widows: 3 }}>
+              <span className="editorial-serif text-[7pt] text-[#c4a882] font-bold absolute -left-0 top-0 select-none">{p.originalIndex + 1}</span>
+              <RichTextParagraph className="rich-text-content editorial-serif text-[10.5pt] leading-[1.9] text-[#2a2a2a] outline-none pl-3" html={p.en} onChange={(h) => handleEnEdit(p.originalIndex, h)} />
+              {p.zh && <RichTextParagraph className="rich-text-content text-[8pt] leading-snug text-gray-400 mt-2 outline-none pl-3" style={{ fontFamily: 'sans-serif' }} html={p.zh} onChange={(h) => handleZhEdit(p.originalIndex, h)} />}
             </div>
           ))}
         </div>
-        <div className="col-span-4 bg-[#1a1a1a] p-5 rounded overflow-hidden flex flex-col gap-5">
+        <div className="col-span-4 bg-[#faf8f5] p-5 rounded border border-[#e8e0d4] overflow-hidden flex flex-col gap-5">
           {page.vocabs.length > 0 && (
             <div>
-              <h3 className="text-[8pt] uppercase tracking-[0.2em] text-[#8b0000] font-bold mb-3 pb-2 border-b border-gray-700">Vocabulary</h3>
+              <h3 className="text-[8pt] uppercase tracking-[0.2em] text-[#8b0000] font-bold mb-3 pb-2 border-b border-[#e8e0d4]">Vocabulary</h3>
               <div className="space-y-3">
                 {page.vocabs.map(v => (
                   <div key={v.id} className="border-l-[3px] pl-3 py-1" style={{ borderLeftColor: v.color || '#8b0000' }}>
-                    <div className="editorial-serif font-bold text-[10pt] text-white">{v.word}</div>
-                    <div className="text-[7.5pt] text-gray-400 mt-1 leading-tight" style={{ fontFamily: 'sans-serif' }}>{v.definition}</div>
+                    <div className="editorial-serif font-bold text-[10pt] text-[#1a1a1a]">{v.word}</div>
+                    <div className="text-[7.5pt] text-[#6b6b6b] mt-1 leading-tight" style={{ fontFamily: 'sans-serif' }}>{v.definition}</div>
                   </div>
                 ))}
               </div>
@@ -328,12 +330,12 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
           )}
           {page.notes.length > 0 && (
             <div>
-              <h3 className="text-[8pt] uppercase tracking-[0.2em] text-[#8b0000] font-bold mb-3 pb-2 border-b border-gray-700">Notes</h3>
+              <h3 className="text-[8pt] uppercase tracking-[0.2em] text-[#8b0000] font-bold mb-3 pb-2 border-b border-[#e8e0d4]">Notes</h3>
               <div className="space-y-3">
                 {page.notes.map(n => (
                   <div key={n.id} className="border-l-[3px] pl-3 py-1" style={{ borderLeftColor: n.color || '#8b0000' }}>
-                    <div className="editorial-serif text-[7.5pt] text-gray-500 italic mb-1 line-clamp-2">&ldquo;{n.text}&rdquo;</div>
-                    <div className="text-[8.5pt] text-gray-300 leading-tight" style={{ fontFamily: 'sans-serif' }}>{n.comment}</div>
+                    <div className="editorial-serif text-[7.5pt] text-[#888] italic mb-1 line-clamp-2">&ldquo;{n.text}&rdquo;</div>
+                    <div className="text-[8.5pt] text-[#2a2a2a] leading-tight" style={{ fontFamily: 'sans-serif' }}>{n.comment}</div>
                   </div>
                 ))}
               </div>
@@ -382,9 +384,10 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
       <div className="flex-1 min-h-0 grid grid-cols-12 gap-5">
         <div className="col-span-8 overflow-hidden">
           {page.paragraphs.map((p) => (
-            <div key={p.originalIndex} className="mb-5 break-inside-avoid" style={{ breakInside: 'avoid' }}>
-              <RichTextParagraph className="rich-text-content text-[10.5pt] leading-[2] text-[#2c2416] outline-none" style={{ fontFamily: 'Georgia, serif' }} html={p.en} onChange={(h) => handleEnEdit(p.originalIndex, h)} />
-              {p.zh && <RichTextParagraph className="rich-text-content handwritten-font text-[9pt] leading-relaxed text-[#8b7355] mt-1 outline-none" html={p.zh} onChange={(h) => handleZhEdit(p.originalIndex, h)} />}
+            <div key={p.originalIndex} className="mb-5 break-inside-avoid relative" style={{ breakInside: 'avoid' }}>
+              <span className="handwritten-font text-[9pt] text-[#c4a882] absolute -left-0 top-0 select-none">{p.originalIndex + 1}</span>
+              <RichTextParagraph className="rich-text-content text-[10.5pt] leading-[2] text-[#2c2416] outline-none pl-4" style={{ fontFamily: 'Georgia, serif' }} html={p.en} onChange={(h) => handleEnEdit(p.originalIndex, h)} />
+              {p.zh && <RichTextParagraph className="rich-text-content handwritten-font text-[9pt] leading-relaxed text-[#8b7355] mt-1 outline-none pl-4" html={p.zh} onChange={(h) => handleZhEdit(p.originalIndex, h)} />}
             </div>
           ))}
         </div>
