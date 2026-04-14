@@ -27,3 +27,5 @@ export interface Note {
 }
 
 export type AppMode = 'input' | 'read' | 'layout';
+
+export type DesignStyle = 'academic' | 'editorial' | 'handwritten';
