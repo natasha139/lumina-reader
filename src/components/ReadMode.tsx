@@ -226,9 +226,9 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
             word: v.word,
             word_data: {
               word: v.word,
-              definition_cn: v.definition,
+              definition_cn: v.definition.replace(/<[^>]*>/g, ''),
               definition_en: '',
-              example_sentence: v.context,
+              example_sentence: v.context.replace(/<[^>]*>/g, ''),
               source_tag: 'lumina-reader',
               academic_level: article.difficulty,
             },
@@ -326,7 +326,8 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
   const getContextSentence = (word: string, pIdx: number) => {
     const paragraphs = article.body.split(/\n+/).filter(p => p.trim());
     const targetP = paragraphs[pIdx] || article.body;
-    const sentences = targetP.match(/[^.!?]+[.!?]+/g) || [targetP];
+    const plain = targetP.replace(/<[^>]*>/g, '');
+    const sentences = plain.match(/[^.!?]+[.!?]+/g) || [plain];
     const sentence = sentences.find(s => s.includes(word));
     return sentence ? sentence.trim() : word;
   };
