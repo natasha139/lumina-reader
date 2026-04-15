@@ -93,7 +93,7 @@ export default function ReadMode({
   const [showStudentPicker, setShowStudentPicker] = useState(false);
   const [editingVocabId, setEditingVocabId] = useState<string | null>(null);
   const [editingDefinition, setEditingDefinition] = useState('');
-  const [students, setStudents] = useState<{ id: number; student_name: string }[]>([]);
+  const [students, setStudents] = useState<{ id: number; name: string }[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [pushing, setPushing] = useState('');
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -256,7 +256,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
           title: article.title,
           source_name: 'Lumina Reader',
           raw_text: article.body,
-          annotated_html: '',
+          annotated_html: article.body,
         }),
       });
       if (!res.ok) throw new Error('Failed');
@@ -666,7 +666,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
                     disabled={pushing === 'encounter'}
                     className="w-full px-4 py-3 text-left rounded-xl hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50 flex items-center justify-between"
                   >
-                    {s.student_name}
+                    {s.name}
                     {pushing === 'encounter' && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
                   </button>
                 ))
