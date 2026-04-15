@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Article, Vocabulary, Note } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { BookmarkPlus, MessageSquarePlus, LayoutTemplate, ArrowLeft, Bold, Italic, Underline, Highlighter, Eraser, Languages, Share2, FileDown, BookOpen, Library, Send, X, Loader2 } from 'lucide-react';
+import { BookmarkPlus, LayoutTemplate, ArrowLeft, Bold, Italic, Underline, Highlighter, Eraser, Languages, Share2, FileDown, BookOpen, Library, Send, X, Loader2, Pencil, Trash2, Check, PenLine } from 'lucide-react';
 
 const RichTextParagraph = ({
   html,
   onChange,
   className,
   style,
-  'data-paragraph-index': dataParagraphIndex
+  'data-paragraph-index': dataParagraphIndex,
+  'data-placeholder': dataPlaceholder
 }: {
   html: string;
   onChange: (html: string) => void;
   className?: string;
   style?: React.CSSProperties;
   'data-paragraph-index'?: number;
+  'data-placeholder'?: string;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const lastHtmlRef = useRef(html);
@@ -38,6 +40,7 @@ const RichTextParagraph = ({
       className={className}
       style={style}
       data-paragraph-index={dataParagraphIndex}
+      data-placeholder={dataPlaceholder}
       contentEditable={true}
       suppressContentEditableWarning={true}
       onClick={(e) => e.stopPropagation()}
@@ -59,7 +62,8 @@ interface ReadModeProps {
   vocabularies: Vocabulary[];
   notes: Note[];
   onAddVocabulary: (vocab: Vocabulary) => void;
-  onAddNote: (note: Note) => void;
+  onDeleteVocabulary: (id: string) => void;
+  onUpdateVocabulary: (vocab: Vocabulary) => void;
   onUpdateArticle?: (article: Article) => void;
   onGoToLayout: () => void;
   onBack: () => void;
@@ -70,13 +74,14 @@ export default function ReadMode({
   vocabularies,
   notes,
   onAddVocabulary,
-  onAddNote,
+  onDeleteVocabulary,
+  onUpdateVocabulary,
   onUpdateArticle,
   onGoToLayout,
   onBack
 }: ReadModeProps) {
   const [selection, setSelection] = useState<{ text: string; rect: DOMRect; paragraphIndex: number } | null>(null);
-  const [popupMode, setPopupMode] = useState<'menu' | 'vocab' | 'note'>('menu');
+  const [popupMode, setPopupMode] = useState<'menu' | 'vocab'>('menu');
   const [inputValue, setInputValue] = useState('');
   const [selectedColor, setSelectedColor] = useState('#FF6B6B');
   const contentRef = useRef<HTMLDivElement>(null);
@@ -86,6 +91,8 @@ export default function ReadMode({
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showStudentPicker, setShowStudentPicker] = useState(false);
+  const [editingVocabId, setEditingVocabId] = useState<string | null>(null);
+  const [editingDefinition, setEditingDefinition] = useState('');
   const [students, setStudents] = useState<{ id: number; student_name: string }[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [pushing, setPushing] = useState('');
@@ -316,19 +323,6 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
     window.getSelection()?.removeAllRanges();
   };
 
-  const handleAddNote = () => {
-    if (!selection) return;
-    onAddNote({
-      id: uuidv4(),
-      text: selection.text,
-      comment: inputValue || 'Note placeholder...',
-      paragraphIndex: selection.paragraphIndex,
-      color: selectedColor
-    });
-    setSelection(null);
-    window.getSelection()?.removeAllRanges();
-  };
-
   const getContextSentence = (word: string, pIdx: number) => {
     const paragraphs = article.body.split(/\n+/).filter(p => p.trim());
     const targetP = paragraphs[pIdx] || article.body;
@@ -366,13 +360,13 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
     const enParas = article.body.split(/\n+/).filter(p => p.trim());
     const zhParas = article.translationBody ? article.translationBody.split(/\n+/).filter(p => p.trim()) : [];
     const maxLen = Math.max(enParas.length, zhParas.length);
-    
+
     return (
       <div className="article-content" style={{ columnCount: 2, columnGap: '2.5rem' }}>
         {Array.from({ length: maxLen }).map((_, idx) => {
           return (
             <div key={idx} className="mb-8 break-inside-avoid relative group">
-              <RichTextParagraph 
+              <RichTextParagraph
                 data-paragraph-index={idx}
                 className="rich-text-content text-[1.05rem] leading-[1.8] text-[#2c2c2c] hover:text-black transition-colors outline-none focus:ring-2 focus:ring-gray-200 rounded hover:bg-black/5"
                 style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
@@ -380,7 +374,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
                 onChange={(newHtml) => handleEnEdit(idx, newHtml)}
               />
               {zhParas[idx] !== undefined && (
-                <RichTextParagraph 
+                <RichTextParagraph
                   data-paragraph-index={idx}
                   className="rich-text-content font-sans text-[0.95rem] leading-[1.7] text-gray-500 pt-3 break-words outline-none focus:ring-2 focus:ring-gray-200 rounded hover:bg-black/5"
                   html={zhParas[idx] || ''}
@@ -498,9 +492,61 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
               </div>
               <div className="space-y-4">
                 {vocabularies.map(v => (
-                  <div key={v.id} className="bg-white p-5 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100/50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow border-l-[3px]" style={{ borderLeftColor: v.color || '#1a1a1a' }}>
-                    <div className="font-bold text-lg text-[#1a1a1a] mb-1" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>{v.word}</div>
-                    <div className="font-sans text-sm text-gray-600 leading-relaxed">{v.definition}</div>
+                  <div key={v.id} className="group bg-white p-5 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100/50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow border-l-[3px]" style={{ borderLeftColor: v.color || '#1a1a1a' }}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="font-bold text-lg text-[#1a1a1a] mb-1" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>{v.word}</div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        {editingVocabId === v.id ? (
+                          <button
+                            onClick={() => {
+                              onUpdateVocabulary({ ...v, definition: editingDefinition });
+                              setEditingVocabId(null);
+                            }}
+                            className="p-1 rounded hover:bg-green-50 text-green-500"
+                            title="保存"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setEditingVocabId(v.id);
+                              setEditingDefinition(v.definition);
+                            }}
+                            className="p-1 rounded hover:bg-gray-100 text-gray-400"
+                            title="编辑"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onDeleteVocabulary(v.id)}
+                          className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"
+                          title="删除"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    {editingVocabId === v.id ? (
+                      <textarea
+                        value={editingDefinition}
+                        onChange={e => setEditingDefinition(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            onUpdateVocabulary({ ...v, definition: editingDefinition });
+                            setEditingVocabId(null);
+                          }
+                          if (e.key === 'Escape') setEditingVocabId(null);
+                        }}
+                        className="w-full font-sans text-sm text-gray-600 leading-relaxed bg-gray-50 border border-gray-200 rounded px-2 py-1 resize-none focus:outline-none focus:border-gray-400"
+                        rows={2}
+                        autoFocus
+                      />
+                    ) : (
+                      <div className="font-sans text-sm text-gray-600 leading-relaxed">{v.definition}</div>
+                    )}
                     {v.paragraphIndex !== undefined && (
                       <div className="mt-3 text-[9px] font-bold text-gray-300 uppercase tracking-widest">
                         Para {v.paragraphIndex + 1}
@@ -511,34 +557,6 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
                 {vocabularies.length === 0 && (
                   <div className="py-10 text-center border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
                     <p className="text-xs text-gray-400 font-medium">Select text to add vocabulary</p>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Notes Section */}
-            <section>
-              <div className="flex items-center justify-between mb-6">
-                <h4 className="font-sans font-bold text-gray-400 text-[10px] uppercase tracking-[0.2em] flex items-center gap-2">
-                  <MessageSquarePlus className="w-3.5 h-3.5" /> My Notes
-                </h4>
-                <span className="text-gray-400 font-bold text-xs">{notes.length}</span>
-              </div>
-              <div className="space-y-4">
-                {notes.map(n => (
-                  <div key={n.id} className="bg-white p-5 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100/50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow border-l-[3px]" style={{ borderLeftColor: n.color || '#1a1a1a' }}>
-                    <div className="text-sm text-gray-500 italic mb-3 line-clamp-3 leading-relaxed" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>"{n.text}"</div>
-                    <div className="font-sans text-sm text-[#1a1a1a] font-medium leading-relaxed">{n.comment}</div>
-                    {n.paragraphIndex !== undefined && (
-                      <div className="mt-4 pt-3 border-t border-gray-50 text-[9px] font-bold text-gray-300 uppercase tracking-widest">
-                        Para {n.paragraphIndex + 1}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {notes.length === 0 && (
-                  <div className="py-10 text-center border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
-                    <p className="text-xs text-gray-400 font-medium">Select text to add notes</p>
                   </div>
                 )}
               </div>
@@ -559,17 +577,11 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
             {popupMode === 'menu' && (
               <div className="flex flex-col p-2 gap-2">
                 <div className="flex gap-2">
-                  <button 
+                  <button
                     onClick={() => setPopupMode('vocab')}
                     className="flex-1 h-10 rounded-xl bg-xhs-red text-white hover:bg-xhs-red/90 transition-all flex items-center justify-center gap-2 font-bold"
                   >
                     <BookmarkPlus className="w-4 h-4" /> 记生词
-                  </button>
-                  <button 
-                    onClick={() => setPopupMode('note')}
-                    className="flex-1 h-10 rounded-xl bg-gray-50 text-ink hover:bg-gray-100 transition-all flex items-center justify-center gap-2 font-bold"
-                  >
-                    <MessageSquarePlus className="w-4 h-4" /> 写笔记
                   </button>
                 </div>
                 <button 
@@ -584,6 +596,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
                   <button onMouseDown={(e) => { e.preventDefault(); applyFormat('italic'); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-700 transition-colors" title="斜体"><Italic size={16}/></button>
                   <button onMouseDown={(e) => { e.preventDefault(); applyFormat('underline'); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-700 transition-colors" title="下划线"><Underline size={16}/></button>
                   <div className="w-px h-4 bg-gray-200 mx-1" />
+                  <button onMouseDown={(e) => { e.preventDefault(); applyFormat('foreColor', '#6C5CE7'); }} className="p-2 hover:bg-gray-100 rounded-lg text-[#6C5CE7] transition-colors" title="批注"><PenLine size={16}/></button>
                   <button onMouseDown={(e) => { e.preventDefault(); applyFormat('hiliteColor', '#ffeb3b'); }} className="p-2 hover:bg-gray-100 rounded-lg text-yellow-500 transition-colors" title="高亮"><Highlighter size={16}/></button>
                   <button onMouseDown={(e) => { e.preventDefault(); applyFormat('removeFormat'); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors" title="清除格式"><Eraser size={16}/></button>
                 </div>
@@ -621,37 +634,6 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
                 <div className="flex gap-2">
                   <button onClick={() => setPopupMode('menu')} className="flex-1 h-10 rounded-xl text-gray-400 font-bold hover:bg-gray-50 transition-all">取消</button>
                   <button onClick={handleAddVocab} className="flex-1 h-10 rounded-xl bg-xhs-red text-white font-bold hover:shadow-lg hover:shadow-xhs-red/20 transition-all">保存</button>
-                </div>
-              </div>
-            )}
-
-            {popupMode === 'note' && (
-              <div className="p-4 flex flex-col gap-4">
-                <div className="font-serif italic text-gray-400 line-clamp-1 text-xs px-2 border-l-2 border-gray-100">"{selection.text}"</div>
-                <div className="flex items-center gap-2">
-                  {colorOptions.map(c => (
-                    <button
-                      key={c}
-                      onClick={() => setSelectedColor(c)}
-                      className="w-6 h-6 rounded-full transition-all"
-                      style={{
-                        backgroundColor: c,
-                        boxShadow: selectedColor === c ? `0 0 0 2px white, 0 0 0 4px ${c}` : 'none'
-                      }}
-                    />
-                  ))}
-                </div>
-                <textarea 
-                  autoFocus
-                  placeholder="写下你的感悟..." 
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  className="w-full bg-gray-50 text-ink px-4 py-3 rounded-2xl outline-none placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-xhs-red/10 transition-all resize-none h-28"
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleAddNote()}
-                />
-                <div className="flex gap-2">
-                  <button onClick={() => setPopupMode('menu')} className="flex-1 h-10 rounded-xl text-gray-400 font-bold hover:bg-gray-50 transition-all">取消</button>
-                  <button onClick={handleAddNote} className="flex-1 h-10 rounded-xl bg-xhs-red text-white font-bold hover:shadow-lg hover:shadow-xhs-red/20 transition-all">保存</button>
                 </div>
               </div>
             )}

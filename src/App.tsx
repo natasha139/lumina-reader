@@ -52,8 +52,24 @@ export default function App() {
     setVocabularies(prev => [...prev, vocab]);
   };
 
+  const handleDeleteVocabulary = (id: string) => {
+    setVocabularies(prev => prev.filter(v => v.id !== id));
+  };
+
+  const handleUpdateVocabulary = (updated: Vocabulary) => {
+    setVocabularies(prev => prev.map(v => v.id === updated.id ? updated : v));
+  };
+
   const handleAddNote = (note: Note) => {
     setNotes(prev => [...prev, note]);
+  };
+
+  const handleDeleteNote = (id: string) => {
+    setNotes(prev => prev.filter(n => n.id !== id));
+  };
+
+  const handleUpdateNote = (updated: Note) => {
+    setNotes(prev => prev.map(n => n.id === updated.id ? updated : n));
   };
 
   const handleUpdateArticle = (updatedArticle: Article) => {
@@ -77,7 +93,8 @@ export default function App() {
           vocabularies={vocabularies}
           notes={notes}
           onAddVocabulary={handleAddVocabulary}
-          onAddNote={handleAddNote}
+          onDeleteVocabulary={handleDeleteVocabulary}
+          onUpdateVocabulary={handleUpdateVocabulary}
           onUpdateArticle={handleUpdateArticle}
           onGoToLayout={() => setMode('layout')}
           onBack={() => setMode('input')}
