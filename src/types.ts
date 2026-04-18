@@ -16,6 +16,7 @@ export interface Vocabulary {
   context: string;
   paragraphIndex?: number;
   color?: string;
+  phonetic?: string;
 }
 
 export interface Note {

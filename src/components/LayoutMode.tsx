@@ -247,6 +247,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                   {page.vocabs.map(v => (
                     <div key={v.id} className="bg-white border-l-[3px] p-2 rounded shadow-sm" style={{ borderLeftColor: v.color || '#333' }}>
                       <div className="academic-body font-bold text-[9.5pt] text-gray-900">{v.word}</div>
+                      {v.phonetic && <div className="text-[7pt] text-gray-400">{v.phonetic}</div>}
                       <div className="academic-title text-[7.5pt] text-gray-600 mt-1 leading-tight">{v.definition}</div>
                     </div>
                   ))}
@@ -322,6 +323,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                 {page.vocabs.map(v => (
                   <div key={v.id} className="border-l-[3px] pl-3 py-1" style={{ borderLeftColor: v.color || '#8b0000' }}>
                     <div className="editorial-serif font-bold text-[10pt] text-[#1a1a1a]">{v.word}</div>
+                    {v.phonetic && <div className="text-[7pt] text-[#999]">{v.phonetic}</div>}
                     <div className="text-[7.5pt] text-[#6b6b6b] mt-1 leading-tight" style={{ fontFamily: 'sans-serif' }}>{v.definition}</div>
                   </div>
                 ))}
@@ -399,6 +401,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                 {page.vocabs.map((v, i) => (
                   <div key={v.id} className="bg-white/80 p-3 rounded-xl shadow-[2px_2px_8px_rgba(0,0,0,0.06)] border border-[#e8dcc8]" style={{ transform: `rotate(${i % 2 === 0 ? -0.5 : 0.8}deg)`, borderLeftWidth: '4px', borderLeftColor: v.color || '#FF6B6B' }}>
                     <div className="handwritten-font font-bold text-[10pt] text-[#2c2416]">{v.word}</div>
+                    {v.phonetic && <div className="text-[7pt] text-[#a89070]">{v.phonetic}</div>}
                     <div className="text-[7.5pt] text-[#8b7355] mt-1 leading-tight" style={{ fontFamily: 'sans-serif' }}>{v.definition}</div>
                   </div>
                 ))}

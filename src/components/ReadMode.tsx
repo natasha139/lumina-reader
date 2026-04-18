@@ -96,6 +96,8 @@ export default function ReadMode({
   const [students, setStudents] = useState<{ id: number; name: string }[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [pushing, setPushing] = useState('');
+  const [phonetic, setPhonetic] = useState('');
+  const [phoneticLoading, setPhoneticLoading] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const API = {
@@ -107,6 +109,20 @@ export default function ReadMode({
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const fetchPhonetic = async (word: string) => {
+    setPhonetic('');
+    setPhoneticLoading(true);
+    try {
+      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.trim().toLowerCase())}`);
+      if (res.ok) {
+        const data = await res.json();
+        const ipa = data[0]?.phonetic || data[0]?.phonetics?.find((p: { text?: string }) => p.text)?.text || '';
+        setPhonetic(ipa);
+      }
+    } catch { /* ignore */ }
+    setPhoneticLoading(false);
   };
 
   // Close export menu on outside click
@@ -124,6 +140,7 @@ export default function ReadMode({
     const vocabHtml = vocabularies.map(v => `
       <div style="background:#fff;padding:16px;border-radius:8px;border-left:3px solid ${v.color || '#1a1a1a'};margin-bottom:12px;">
         <div style="font-family:Georgia,serif;font-weight:bold;font-size:18px;color:#1a1a1a;">${v.word}</div>
+        ${v.phonetic ? `<div style="font-size:13px;color:#999;margin-top:2px;">${v.phonetic}</div>` : ''}
         <div style="font-size:14px;color:#666;margin-top:4px;">${v.definition}</div>
         <div style="font-size:12px;color:#999;margin-top:8px;font-style:italic;">${v.context}</div>
       </div>`).join('');
@@ -317,9 +334,11 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
       definition: inputValue || 'Definition placeholder...',
       context: getContextSentence(selection.text, selection.paragraphIndex),
       paragraphIndex: selection.paragraphIndex,
-      color: selectedColor
+      color: selectedColor,
+      phonetic: phonetic || undefined
     });
     setSelection(null);
+    setPhonetic('');
     window.getSelection()?.removeAllRanges();
   };
 
@@ -347,8 +366,10 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
   };
 
   const handleZhEdit = (idx: number, newHtml: string) => {
-    if (!onUpdateArticle || !article.translationBody) return;
-    const paras = article.translationBody.split(/\n+/).filter(p => p.trim());
+    if (!onUpdateArticle) return;
+    const paras = article.translationBody ? article.translationBody.split(/\n+/).filter(p => p.trim()) : [];
+    // Extend array if editing a paragraph beyond current length
+    while (paras.length <= idx) paras.push('');
     paras[idx] = newHtml;
     onUpdateArticle({
       ...article,
@@ -374,9 +395,10 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
                 html={enParas[idx] || ''}
                 onChange={(newHtml) => handleEnEdit(idx, newHtml)}
               />
-              {zhParas[idx] !== undefined && (
+              {article.translationBody !== undefined && (
                 <RichTextParagraph
                   data-paragraph-index={idx}
+                  data-placeholder="输入中文翻译..."
                   className="rich-text-content font-sans text-[0.95rem] leading-[1.7] text-gray-500 pt-3 break-words outline-none focus:ring-2 focus:ring-gray-200 rounded hover:bg-black/5"
                   html={zhParas[idx] || ''}
                   onChange={(newHtml) => handleZhEdit(idx, newHtml)}
@@ -409,6 +431,12 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
           .rich-text-content *::selection {
             background-color: rgba(0, 0, 0, 0.15);
             color: inherit;
+          }
+          .rich-text-content[data-placeholder]:empty::before {
+            content: attr(data-placeholder);
+            color: #ccc;
+            font-style: italic;
+            pointer-events: none;
           }
         `}
       </style>
@@ -463,9 +491,12 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
           </div>
 
           <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-5xl font-bold text-[#1a1a1a] mb-6 leading-[1.15] tracking-tight" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+            <h1 className="text-4xl md:text-5xl font-bold text-[#1a1a1a] mb-4 leading-[1.15] tracking-tight" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
               {article.title}
             </h1>
+            {article.date && (
+              <div className="font-sans text-xs text-gray-400 font-medium uppercase tracking-widest mb-4">{article.date}</div>
+            )}
             {article.subtitle && (
               <h2 className="font-sans text-xl text-gray-500 font-medium leading-relaxed">
                 {article.subtitle}
@@ -496,6 +527,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
                   <div key={v.id} className="group bg-white p-5 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100/50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow border-l-[3px]" style={{ borderLeftColor: v.color || '#1a1a1a' }}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="font-bold text-lg text-[#1a1a1a] mb-1" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>{v.word}</div>
+                      {v.phonetic && <div className="text-xs text-gray-400 font-sans -mt-0.5 mb-1">{v.phonetic}</div>}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                         {editingVocabId === v.id ? (
                           <button
@@ -579,7 +611,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
               <div className="flex flex-col p-2 gap-2">
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setPopupMode('vocab')}
+                    onClick={() => { setPopupMode('vocab'); if (selection) fetchPhonetic(selection.text); }}
                     className="flex-1 h-10 rounded-xl bg-xhs-red text-white hover:bg-xhs-red/90 transition-all flex items-center justify-center gap-2 font-bold"
                   >
                     <BookmarkPlus className="w-4 h-4" /> 记生词
@@ -606,9 +638,16 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
 
             {popupMode === 'vocab' && (
               <div className="p-4 flex flex-col gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-1 h-4 rounded-full" style={{ backgroundColor: selectedColor }} />
-                  <div className="font-serif font-black truncate text-lg" style={{ color: selectedColor }}>{selection.text}</div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-4 rounded-full" style={{ backgroundColor: selectedColor }} />
+                    <div className="font-serif font-black truncate text-lg" style={{ color: selectedColor }}>{selection.text}</div>
+                  </div>
+                  {phoneticLoading ? (
+                    <div className="text-xs text-gray-400 mt-1 ml-3">loading...</div>
+                  ) : phonetic && (
+                    <div className="text-sm text-gray-400 mt-1 ml-3 font-sans">{phonetic}</div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {colorOptions.map(c => (
