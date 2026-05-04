@@ -40,9 +40,9 @@ export default function SyncPanel({ syncCode, onLinkDevice, onClose }: SyncPanel
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 p-8 relative"
+        className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-sm p-6 sm:p-8 relative max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <button
@@ -93,28 +93,26 @@ export default function SyncPanel({ syncCode, onLinkDevice, onClose }: SyncPanel
         {/* 输入另一台设备的同步码 */}
         <div>
           <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">输入其他设备的同步码</div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={inputCode}
-              onChange={e => {
-                setInputCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6));
-                setLinkError('');
-              }}
-              placeholder="XXXXXX"
-              maxLength={6}
-              className="flex-1 bg-gray-50 rounded-2xl px-5 py-3 font-mono text-xl font-black text-ink tracking-[0.3em] text-center outline-none focus:ring-2 focus:ring-gray-200 transition-all"
-            />
-            <button
-              onClick={handleLink}
-              disabled={linking || linkSuccess}
-              className="w-11 h-11 flex items-center justify-center rounded-2xl bg-ink text-white hover:bg-black transition-all flex-shrink-0 disabled:opacity-50"
-            >
-              {linkSuccess ? <Check className="w-4 h-4 text-green-400" /> : <Link className="w-4 h-4" />}
-            </button>
-          </div>
+          <input
+            type="text"
+            value={inputCode}
+            onChange={e => {
+              setInputCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6));
+              setLinkError('');
+            }}
+            placeholder="XXXXXX"
+            maxLength={6}
+            className="w-full bg-gray-50 rounded-2xl px-5 py-3 font-mono text-xl font-black text-ink tracking-[0.3em] text-center outline-none focus:ring-2 focus:ring-gray-200 transition-all mb-3"
+          />
+          <button
+            onClick={handleLink}
+            disabled={linking || linkSuccess}
+            className="w-full py-3 rounded-2xl bg-ink text-white font-sans font-black text-sm hover:bg-black transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {linkSuccess ? <><Check className="w-4 h-4" /> 同步成功</> : linking ? '同步中...' : <><Link className="w-4 h-4" /> 连接此设备</>}
+          </button>
           {linkError && <p className="text-red-400 text-xs mt-2 ml-1">{linkError}</p>}
-          {linkSuccess && <p className="text-green-500 text-xs mt-2 ml-1">同步成功，正在跳转...</p>}
+          {linkSuccess && <p className="text-green-500 text-xs mt-2 ml-1">正在跳转...</p>}
         </div>
       </div>
     </div>
