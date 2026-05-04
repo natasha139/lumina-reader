@@ -1,0 +1,8 @@
+name = "lumina-reader"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "lumina_reader_db"
+database_name = "lumina-reader-db"
+database_id = "8e60472a-75d5-419f-8f64-ac4d438d44ea"

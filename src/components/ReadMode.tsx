@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Article, Vocabulary, Note } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { BookmarkPlus, LayoutTemplate, ArrowLeft, Bold, Italic, Underline, Highlighter, Eraser, Languages, Share2, FileDown, BookOpen, Library, Send, X, Loader2, Pencil, Trash2, Check, PenLine } from 'lucide-react';
+import { BookmarkPlus, LayoutTemplate, ArrowLeft, Bold, Italic, Underline, Highlighter, Eraser, Languages, Share2, FileDown, BookOpen, Library, Send, X, Loader2, Pencil, Trash2, Check, PenLine, Cloud } from 'lucide-react';
 
 const RichTextParagraph = ({
   html,
@@ -67,6 +67,8 @@ interface ReadModeProps {
   onUpdateArticle?: (article: Article) => void;
   onGoToLayout: () => void;
   onBack: () => void;
+  syncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
+  onOpenSyncPanel?: () => void;
 }
 
 export default function ReadMode({
@@ -78,7 +80,9 @@ export default function ReadMode({
   onUpdateVocabulary,
   onUpdateArticle,
   onGoToLayout,
-  onBack
+  onBack,
+  syncStatus,
+  onOpenSyncPanel,
 }: ReadModeProps) {
   const [selection, setSelection] = useState<{ text: string; rect: DOMRect; paragraphIndex: number } | null>(null);
   const [popupMode, setPopupMode] = useState<'menu' | 'vocab'>('menu');
@@ -456,6 +460,18 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
                 <span className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 text-[10px] font-bold uppercase tracking-widest">{article.wordCount} WORDS</span>
                 <span className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 text-[10px] font-bold uppercase tracking-widest">{article.difficulty}</span>
               </div>
+              {onOpenSyncPanel && (
+                <button
+                  onClick={onOpenSyncPanel}
+                  title={syncStatus === 'synced' ? '已同步' : syncStatus === 'syncing' ? '同步中...' : syncStatus === 'error' ? '同步失败' : '跨设备同步'}
+                  className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-500 hover:text-black hover:bg-gray-100 transition-all relative"
+                >
+                  <Cloud className="w-5 h-5" />
+                  {syncStatus === 'syncing' && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />}
+                  {syncStatus === 'synced' && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-400" />}
+                  {syncStatus === 'error' && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-400" />}
+                </button>
+              )}
               <button
                 onClick={onGoToLayout}
                 className="bg-[#1a1a1a] text-white px-5 py-2 rounded-full hover:bg-black transition-all flex items-center gap-2 font-sans text-xs font-bold tracking-wide"

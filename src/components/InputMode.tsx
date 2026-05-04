@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { Article } from '../types';
-import { BookOpen, Image as ImageIcon, Languages, History } from 'lucide-react';
+import { BookOpen, Image as ImageIcon, Languages, History, Cloud } from 'lucide-react';
 
 interface InputModeProps {
   onStartReading: (article: Article) => void;
   hasSavedSession?: boolean;
   onLoadSession?: () => void;
   initialArticle?: Article | null;
+  syncCode?: string | null;
+  syncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
+  onOpenSyncPanel?: () => void;
 }
 
-export default function InputMode({ onStartReading, hasSavedSession, onLoadSession, initialArticle }: InputModeProps) {
+export default function InputMode({ onStartReading, hasSavedSession, onLoadSession, initialArticle, syncCode, syncStatus, onOpenSyncPanel }: InputModeProps) {
   const [title, setTitle] = useState(initialArticle?.title || '');
   const [subtitle, setSubtitle] = useState(initialArticle?.subtitle || '');
   const [body, setBody] = useState(initialArticle?.body || '');
@@ -59,6 +62,18 @@ export default function InputMode({ onStartReading, hasSavedSession, onLoadSessi
           >
             <History className="w-4 h-4 text-xhs-red" />
             恢复上次阅读
+          </button>
+        )}
+        {onOpenSyncPanel && (
+          <button
+            onClick={onOpenSyncPanel}
+            className="mt-4 inline-flex items-center gap-2 px-6 py-2.5 bg-white text-gray-500 font-sans font-bold rounded-full hover:shadow-md transition-all border border-gray-100 shadow-sm text-sm"
+          >
+            <Cloud className="w-4 h-4" />
+            {syncCode ? `同步码 ${syncCode}` : '跨设备同步'}
+            {syncStatus === 'syncing' && <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />}
+            {syncStatus === 'synced' && <span className="w-2 h-2 rounded-full bg-green-400" />}
+            {syncStatus === 'error' && <span className="w-2 h-2 rounded-full bg-red-400" />}
           </button>
         )}
       </div>
