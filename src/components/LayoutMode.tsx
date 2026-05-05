@@ -183,7 +183,16 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
     setIsExporting(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      const canvas = await html2canvas(layoutRef.current, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#e5e7eb', logging: true });
+      const el = layoutRef.current;
+      // Force A4 width for capture regardless of viewport (fixes mobile)
+      const prevWidth = el.style.width;
+      const prevMinWidth = el.style.minWidth;
+      el.style.width = '794px';
+      el.style.minWidth = '794px';
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#e5e7eb', logging: false, width: el.scrollWidth, windowWidth: 794 });
+      el.style.width = prevWidth;
+      el.style.minWidth = prevMinWidth;
       const image = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = image;
