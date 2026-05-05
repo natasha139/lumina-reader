@@ -32,6 +32,7 @@ export const onRequestOptions: PagesFunction<Env> = async () => {
 // body: { user_id: string (新设备的 id), sync_code: string }
 // 效果：把新设备的 user_id 指向同步码对应的数据
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  try {
   let body: { user_id?: string; sync_code?: string };
   try {
     body = await request.json();
@@ -52,17 +53,23 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   if (!source) return json({ error: 'invalid sync code' }, 404);
 
+  let sessionData: unknown;
+  try {
+    sessionData = JSON.parse(source.session_json);
+  } catch {
+    return json({ error: 'corrupt session data' }, 500);
+  }
+
   // 如果新设备 user_id 和源 user_id 相同，直接返回
   if (source.user_id === user_id) {
     return json({
       ok: true,
-      session: JSON.parse(source.session_json),
+      session: sessionData,
       sync_code: source.sync_code,
     });
   }
 
   // 把新 user_id 也写入一条记录，共享同一个 sync_code 和数据
-  // 注意：两台设备各自保存时都会更新自己的 user_id 行，sync_code 保持一致
   await env.lumina_reader_db
     .prepare(`
       INSERT INTO sessions (user_id, sync_code, session_json, updated_at)
@@ -77,7 +84,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   return json({
     ok: true,
-    session: JSON.parse(source.session_json),
+    session: sessionData,
     sync_code: source.sync_code,
   });
+  } catch {
+    return json({ error: '服务器错误，请重试' }, 500);
+  }
 };
