@@ -194,10 +194,26 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
       el.style.width = prevWidth;
       el.style.minWidth = prevMinWidth;
       const image = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = image;
-      link.download = `${article.title.replace(/\s+/g, '-').toLowerCase()}-curation.png`;
-      link.click();
+
+      // On mobile, link.click() download doesn't work — show image for long-press save
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px';
+        overlay.innerHTML = `
+          <p style="color:white;font-size:14px;font-family:sans-serif;margin:0">长按图片保存到相册</p>
+          <img src="${image}" style="max-width:100%;max-height:80vh;border-radius:8px;display:block" />
+          <button style="color:white;font-size:14px;font-family:sans-serif;background:rgba(255,255,255,0.15);border:none;padding:10px 28px;border-radius:20px;cursor:pointer">关闭</button>
+        `;
+        overlay.querySelector('button')!.onclick = () => overlay.remove();
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        document.body.appendChild(overlay);
+      } else {
+        const link = document.createElement('a');
+        link.href = image;
+        link.download = `${article.title.replace(/\s+/g, '-').toLowerCase()}-curation.png`;
+        link.click();
+      }
     } catch (error) {
       console.error('Export failed:', error);
       alert('Failed to export. Please try again.');
