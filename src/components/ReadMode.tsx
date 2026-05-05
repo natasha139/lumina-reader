@@ -314,8 +314,14 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
       }
     };
 
+    const handleSelectionDelayed = () => setTimeout(handleSelection, 50);
+
     document.addEventListener('mouseup', handleSelection);
-    return () => document.removeEventListener('mouseup', handleSelection);
+    document.addEventListener('touchend', handleSelectionDelayed);
+    return () => {
+      document.removeEventListener('mouseup', handleSelection);
+      document.removeEventListener('touchend', handleSelectionDelayed);
+    };
   }, []);
 
   // Close popup when clicking outside
