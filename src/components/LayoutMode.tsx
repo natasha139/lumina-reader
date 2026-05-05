@@ -190,7 +190,40 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
       el.style.width = '794px';
       el.style.minWidth = '794px';
       await new Promise(resolve => setTimeout(resolve, 100));
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#e5e7eb', logging: false, width: el.scrollWidth, windowWidth: 794 });
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#e5e7eb',
+        logging: false,
+        width: el.scrollWidth,
+        windowWidth: 794,
+        onclone: (_doc, clonedEl) => {
+          // html2canvas doesn't support oklch — replace with fallback colors
+          const all = clonedEl.querySelectorAll('*');
+          const props = ['color', 'background-color', 'border-color', 'outline-color', 'box-shadow'];
+          all.forEach((node) => {
+            const el = node as HTMLElement;
+            const style = el.style;
+            props.forEach(prop => {
+              const val = style.getPropertyValue(prop);
+              if (val && val.includes('oklch')) {
+                style.setProperty(prop, 'transparent');
+              }
+            });
+            // Also fix computed styles via inline override
+            try {
+              const computed = window.getComputedStyle(el);
+              props.forEach(prop => {
+                const val = computed.getPropertyValue(prop);
+                if (val && val.includes('oklch')) {
+                  style.setProperty(prop, prop === 'color' ? '#1a1a1a' : 'transparent');
+                }
+              });
+            } catch {}
+          });
+        }
+      });
       el.style.width = prevWidth;
       el.style.minWidth = prevMinWidth;
       const image = canvas.toDataURL('image/png');
@@ -216,7 +249,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
       }
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Failed to export. Please try again.');
+      alert('导出失败: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setIsExporting(false);
     }
