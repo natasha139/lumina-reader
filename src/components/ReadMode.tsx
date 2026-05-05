@@ -388,7 +388,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
     const maxLen = Math.max(enParas.length, zhParas.length);
 
     return (
-      <div className="article-content" style={{ columnCount: 2, columnGap: '2.5rem' }}>
+      <div className="article-content md:columns-2" style={{ columnGap: '2.5rem' }}>
         {Array.from({ length: maxLen }).map((_, idx) => {
           return (
             <div key={idx} className="mb-8 break-inside-avoid relative group">
@@ -447,7 +447,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
       
       <div className="max-w-[1000px] mx-auto bg-white shadow-sm border border-gray-200 relative overflow-hidden">
         {/* Header */}
-        <header className="p-8 md:p-12 border-b border-gray-200">
+        <header className="p-5 md:p-12 border-b border-gray-200">
           <div className="flex justify-between items-start mb-10">
             <button 
               onClick={onBack} 
@@ -524,12 +524,12 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
         {/* Core Layout */}
         <div className="grid grid-cols-1 md:grid-cols-12 min-h-[500px]">
           {/* Left: Main Content */}
-          <div className="md:col-span-8 p-8 md:p-12 border-r border-gray-100" ref={contentRef}>
+          <div className="md:col-span-8 p-5 md:p-12 border-r border-gray-100" ref={contentRef}>
             {renderHighlightedText()}
           </div>
 
           {/* Right: Sidebar */}
-          <div className="md:col-span-4 bg-[#fafafa] p-8 md:p-10 flex flex-col gap-12 border-l border-gray-100">
+          <div className="md:col-span-4 bg-[#fafafa] p-5 md:p-10 flex flex-col gap-12 border-l border-gray-100">
             {/* Vocabulary Section */}
             <section>
               <div className="flex items-center justify-between mb-6">
