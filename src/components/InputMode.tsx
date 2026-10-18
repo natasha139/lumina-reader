@@ -55,6 +55,17 @@ export default function InputMode({ onStartReading, hasSavedSession, onLoadSessi
         </h1>
         <p className="font-sans text-gray-400 text-lg font-medium">整理、标注并导出属于你的精美阅读笔记</p>
         
+        <div className="mt-6">
+          <a
+            href="https://www.deepl.com/en/translator"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-white text-ink font-sans font-bold rounded-full hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink transition-all border border-gray-100 shadow-sm text-sm"
+          >
+            <Languages className="w-4 h-4 text-xhs-red" aria-hidden="true" />
+            DeepL 翻译
+          </a>
+        </div>
         {hasSavedSession && (
           <button
             onClick={onLoadSession}
