@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Article } from '../types';
-import type { ReadingStatus } from '../lib/library';
+import { articleContentKey, type LibraryEntry, type ReadingStatus } from '../lib/library';
 import { BookOpen, Image as ImageIcon, Languages, History, Cloud } from 'lucide-react';
 
 interface InputModeProps {
   onStartReading: (article: Article, status?: ReadingStatus) => void;
   onBack?: () => void;
+  existingArticles?: LibraryEntry[];
+  onOpenDuplicate?: (id: string) => void;
   hasSavedSession?: boolean;
   onLoadSession?: () => void;
   initialArticle?: Article | null;
@@ -14,7 +16,7 @@ interface InputModeProps {
   onOpenSyncPanel?: () => void;
 }
 
-export default function InputMode({ onStartReading, onBack, hasSavedSession, onLoadSession, initialArticle, syncCode, syncStatus, onOpenSyncPanel }: InputModeProps) {
+export default function InputMode({ onStartReading, onBack, existingArticles = [], onOpenDuplicate, hasSavedSession, onLoadSession, initialArticle, syncCode, syncStatus, onOpenSyncPanel }: InputModeProps) {
   const [title, setTitle] = useState(initialArticle?.title || '');
   const [subtitle, setSubtitle] = useState(initialArticle?.subtitle || '');
   const [body, setBody] = useState(initialArticle?.body || '');
@@ -22,6 +24,10 @@ export default function InputMode({ onStartReading, onBack, hasSavedSession, onL
   const [isBilingual, setIsBilingual] = useState(!!initialArticle?.translationBody);
   const [difficulty, setDifficulty] = useState(initialArticle?.difficulty || 'Intermediate');
   const [imageUrl, setImageUrl] = useState(initialArticle?.imageUrl === 'https://picsum.photos/seed/reading/800/600' ? '' : (initialArticle?.imageUrl || ''));
+
+  const [pending, setPending] = useState<{ article: Article; status: ReadingStatus; duplicateId: string } | null>(null);
+
+  useEffect(() => setPending(null), [title, subtitle, body, translationBody, isBilingual, difficulty, imageUrl]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +40,7 @@ export default function InputMode({ onStartReading, onBack, hasSavedSession, onL
       day: 'numeric',
     });
 
-    onStartReading({
+    const newArticle: Article = {
       title: title.trim(),
       subtitle,
       body,
@@ -43,7 +49,11 @@ export default function InputMode({ onStartReading, onBack, hasSavedSession, onL
       difficulty,
       wordCount,
       imageUrl: imageUrl || 'https://picsum.photos/seed/reading/800/600',
-    }, (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'unread' ? 'unread' : 'reading');
+    };
+    const status = (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'unread' ? 'unread' : 'reading';
+    const duplicate = existingArticles.find(entry => articleContentKey(entry.article) === articleContentKey(newArticle));
+    if (duplicate) { setPending({ article: newArticle, status, duplicateId: duplicate.id }); return; }
+    onStartReading(newArticle, status);
   };
 
   return (
@@ -202,6 +212,14 @@ export default function InputMode({ onStartReading, onBack, hasSavedSession, onL
         </div>
 
         <p className="text-xs text-gray-500 leading-relaxed">导入后可逐段补译；缺少的译文会保留空位。若原文与译文分段不同，请先核对每段对应关系。</p>
+        {pending && <div role="alert" className="p-4 bg-amber-50 rounded-xl text-sm text-amber-800 space-y-3">
+          <p>书架中已有相同英文正文。可以打开已有文章，或把这次导入单独保留为新版本。</p>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={() => onOpenDuplicate?.(pending.duplicateId)} className="library-secondary">打开已有文章</button>
+            <button type="button" onClick={() => onStartReading(pending.article, pending.status)} className="library-secondary">仍保存为新版本</button>
+            <button type="button" onClick={() => setPending(null)} className="text-xs underline">继续修改内容</button>
+          </div>
+        </div>}
         <div className="pt-6">
           <button type="submit" value="unread" className="library-secondary w-full mb-3">保存到待读</button>
           <button

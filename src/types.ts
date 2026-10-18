@@ -16,6 +16,14 @@ export interface Article {
   imageUrl?: string;
 }
 
+export interface VocabularyOccurrence {
+  sourceText: string;
+  originalContext: string;
+  context: string;
+  paragraphId?: string;
+  paragraphIndex?: number;
+}
+
 export interface Vocabulary {
   id: string;
   word: string;
@@ -24,12 +32,24 @@ export interface Vocabulary {
   paragraphIndex?: number;
   color?: string;
   phonetic?: string;
+  partOfSpeech?: string;
+  collocations?: string;
+  sourceText?: string;
+  originalContext?: string;
+  paragraphId?: string;
+  occurrences?: VocabularyOccurrence[];
 }
+
+export type NoteKind = 'sentence' | 'expression' | 'question';
 
 export interface Note {
   id: string;
   text: string;
   comment: string;
+  originalText?: string;
+  rewrite?: string;
+  kind?: NoteKind;
+  paragraphId?: string;
   paragraphIndex?: number;
   color?: string;
 }

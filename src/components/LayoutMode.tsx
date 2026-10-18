@@ -113,8 +113,8 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
       currentPage.paragraphs.push({ en, zh, originalIndex: idx });
       currentCharCount += paraChars;
 
-      const pVocabs = vocabularies.filter(v => v.paragraphIndex === idx);
-      const pNotes = notes.filter(n => n.paragraphIndex === idx);
+      const pVocabs = vocabularies.filter(v => v.paragraphId ? v.paragraphId === getParagraphs(article)[idx]?.id : v.paragraphIndex === idx);
+      const pNotes = notes.filter(n => n.paragraphId ? n.paragraphId === getParagraphs(article)[idx]?.id : n.paragraphIndex === idx);
       currentPage.vocabs.push(...pVocabs);
       currentPage.notes.push(...pNotes);
     });
@@ -315,8 +315,10 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                   {page.vocabs.map(v => (
                     <div key={v.id} className="bg-white border-l-[3px] p-2 rounded shadow-sm" style={{ borderLeftColor: v.color || '#333' }}>
                       <div className="academic-body font-bold text-[9.5pt] text-gray-900">{v.word}</div>
+                      {v.partOfSpeech && <div className="text-[7pt] text-gray-400">{v.partOfSpeech}</div>}
                       {v.phonetic && <div className="text-[7pt] text-gray-400">{v.phonetic}</div>}
                       <div className="academic-title text-[7.5pt] text-gray-600 mt-1 leading-tight">{v.definition}</div>
+                      {v.collocations && <div className="text-[7pt] text-gray-500 mt-1 leading-tight">{v.collocations}</div>}
                     </div>
                   ))}
                 </div>
@@ -330,6 +332,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                     <div key={n.id} className="bg-white p-2 rounded shadow-sm border border-gray-100 border-l-[3px]" style={{ borderLeftColor: n.color || '#333' }}>
                       <div className="academic-body text-[7.5pt] text-gray-500 italic mb-1 line-clamp-2">&ldquo;{n.text}&rdquo;</div>
                       <div className="academic-title text-[8.5pt] text-gray-900 leading-tight">{n.comment}</div>
+                      {n.rewrite && <div className="text-[7.5pt] text-gray-500 mt-1 italic">{n.rewrite}</div>}
                     </div>
                   ))}
                 </div>
@@ -391,8 +394,10 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                 {page.vocabs.map(v => (
                   <div key={v.id} className="border-l-[3px] pl-3 py-1" style={{ borderLeftColor: v.color || '#8b0000' }}>
                     <div className="editorial-serif font-bold text-[10pt] text-[#1a1a1a]">{v.word}</div>
+                      {v.partOfSpeech && <div className="text-[7pt] text-gray-400">{v.partOfSpeech}</div>}
                     {v.phonetic && <div className="text-[7pt] text-[#999]">{v.phonetic}</div>}
                     <div className="text-[7.5pt] text-[#6b6b6b] mt-1 leading-tight" style={{ fontFamily: 'sans-serif' }}>{v.definition}</div>
+                      {v.collocations && <div className="text-[7pt] text-gray-500 mt-1 leading-tight">{v.collocations}</div>}
                   </div>
                 ))}
               </div>
@@ -406,6 +411,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                   <div key={n.id} className="border-l-[3px] pl-3 py-1" style={{ borderLeftColor: n.color || '#8b0000' }}>
                     <div className="editorial-serif text-[7.5pt] text-[#888] italic mb-1 line-clamp-2">&ldquo;{n.text}&rdquo;</div>
                     <div className="text-[8.5pt] text-[#2a2a2a] leading-tight" style={{ fontFamily: 'sans-serif' }}>{n.comment}</div>
+                      {n.rewrite && <div className="text-[7.5pt] text-gray-500 mt-1 italic">{n.rewrite}</div>}
                   </div>
                 ))}
               </div>
@@ -469,8 +475,10 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                 {page.vocabs.map((v, i) => (
                   <div key={v.id} className="bg-white/80 p-3 rounded-xl shadow-[2px_2px_8px_rgba(0,0,0,0.06)] border border-[#e8dcc8]" style={{ transform: `rotate(${i % 2 === 0 ? -0.5 : 0.8}deg)`, borderLeftWidth: '4px', borderLeftColor: v.color || '#FF6B6B' }}>
                     <div className="handwritten-font font-bold text-[10pt] text-[#2c2416]">{v.word}</div>
+                      {v.partOfSpeech && <div className="text-[7pt] text-gray-400">{v.partOfSpeech}</div>}
                     {v.phonetic && <div className="text-[7pt] text-[#a89070]">{v.phonetic}</div>}
                     <div className="text-[7.5pt] text-[#8b7355] mt-1 leading-tight" style={{ fontFamily: 'sans-serif' }}>{v.definition}</div>
+                      {v.collocations && <div className="text-[7pt] text-gray-500 mt-1 leading-tight">{v.collocations}</div>}
                   </div>
                 ))}
               </div>
@@ -484,6 +492,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
                   <div key={n.id} className="p-3 rounded-xl border-2 border-dashed" style={{ transform: `rotate(${i % 2 === 0 ? 0.5 : -0.8}deg)`, borderColor: n.color || '#4ECDC4', backgroundColor: `${n.color || '#4ECDC4'}15` }}>
                     <div className="text-[7.5pt] text-[#8b7355] italic mb-1 line-clamp-2" style={{ fontFamily: 'Georgia, serif' }}>&ldquo;{n.text}&rdquo;</div>
                     <div className="handwritten-font text-[9pt] text-[#2c2416] leading-tight">{n.comment}</div>
+                      {n.rewrite && <div className="text-[7.5pt] text-gray-500 mt-1 italic">{n.rewrite}</div>}
                   </div>
                 ))}
               </div>

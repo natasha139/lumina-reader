@@ -9,6 +9,7 @@ export interface LibraryEntry {
   notes: Note[];
   status: ReadingStatus;
   updatedAt: number;
+  trashedAt?: number;
   progress?: ReadingProgress;
 }
 export interface ReadingLibrary { version: 2; entries: LibraryEntry[]; activeId: string | null }
@@ -71,7 +72,7 @@ export function normalizeLibrary(value: unknown): ReadingLibrary {
 }
 
 const fingerprint = (entry: LibraryEntry | undefined) => entry ? JSON.stringify({
-  article: entry.article, vocabularies: entry.vocabularies, notes: entry.notes, status: entry.status,
+  article: entry.article, vocabularies: entry.vocabularies, notes: entry.notes, status: entry.status, trashedAt: entry.trashedAt,
 }) : '';
 
 // Three-way merge: edits to different articles combine; concurrent edits to one
@@ -92,3 +93,13 @@ export function mergeLibraries(base: ReadingLibrary, local: ReadingLibrary, remo
   const entries = [...result.values()];
   return { version: 2, entries, activeId: entries.some(e => e.id === local.activeId) ? local.activeId : remote.activeId };
 }
+
+export function trashLibraryEntry(library: ReadingLibrary, id: string, now = Date.now()): ReadingLibrary {
+  const entries = library.entries.map(e => e.id === id ? { ...e, trashedAt: now, updatedAt: now } : e);
+  return { ...library, entries, activeId: library.activeId === id ? entries.find(e => !e.trashedAt)?.id ?? null : library.activeId };
+}
+export function restoreLibraryEntry(library: ReadingLibrary, id: string, now = Date.now()): ReadingLibrary {
+  return { ...library, entries: library.entries.map(e => e.id === id ? { ...e, trashedAt: undefined, updatedAt: now } : e) };
+}
+export const articleContentKey = (article: Article) => article.body.replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ')
+  .replace(/&amp;/gi, '&').normalize('NFKC').replace(/\s+/g, ' ').trim();

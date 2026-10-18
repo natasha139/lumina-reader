@@ -50,3 +50,19 @@ The shared-library API requires Cloudflare Pages Functions and the existing D1
 binding. A static GitHub Pages deployment supports local storage and backups but
 cannot provide cross-device synchronization. Cloudflare production is
 https://lumina-reader-ezz.pages.dev/.
+
+### Context vocabulary, sentence notes and duplicate articles
+
+Select text in the reader to collect vocabulary or a sentence note. Vocabulary
+entries allow an editable lemma, part of speech, contextual meaning, collocations
+and example sentence; captured wording and the original sentence remain separate.
+Matching lemmas can be merged without losing their meanings or paragraph origins.
+Sentence notes support an editable study sentence, structure notes and a rewrite.
+Both can jump back to the source paragraph and are included in library sync and
+HTML export. Optional new fields remain compatible with older saved records.
+
+The bookshelf's trash is reversible: article content, vocabulary and notes are
+retained until restored, including across device synchronization. No permanent
+purge is provided. Importing the same English body prompts the user to open the
+existing article or explicitly keep another version; same titles alone do not
+cause automatic merging or removal.

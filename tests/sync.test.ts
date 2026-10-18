@@ -69,3 +69,15 @@ test('invalid sync codes and malformed libraries do not replace saved data', asy
   assert.equal((await f.post({ user_id: A, library: { version: 2, entries: [{}] }, revision: 0 })).status, 400);
   assert.equal((await f.get(A)).data.revision, 0);
 });
+test('edited learning content and trash state survive an actual shared-library round trip', async () => {
+  const f = fixture(); const account = await f.get(A);
+  const library = emptyLibrary(); const entry = legacyEntry({ article });
+  entry.vocabularies = [{ id: 'word', word: 'weigh on', sourceText: 'was weighing on', originalContext: 'It was weighing on her mind.', context: 'It weighs on my mind.', partOfSpeech: '动词短语', collocations: 'weigh on someone', definition: '使人担忧', paragraphId: 'p-first' }];
+  entry.notes = [{ id: 'sentence', text: 'Edited sentence.', originalText: 'Original sentence.', rewrite: 'My own sentence.', comment: '主干分析', kind: 'sentence', paragraphId: 'p-first' }];
+  entry.trashedAt = 42; library.entries = [entry];
+  assert.equal((await f.post({ user_id: A, library, revision: 0 })).status, 200);
+  const linked = await f.post({ user_id: B, action: 'link', sync_code: account.data.sync_code });
+  assert.deepEqual(linked.data.library.entries[0].vocabularies, entry.vocabularies);
+  assert.deepEqual(linked.data.library.entries[0].notes, entry.notes);
+  assert.equal(linked.data.library.entries[0].trashedAt, 42);
+});

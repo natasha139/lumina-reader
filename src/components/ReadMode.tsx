@@ -2,7 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Article, Vocabulary, Note } from '../types';
 import { getParagraphs, withParagraphs, type ReadingProgress } from '../lib/library';
 import { v4 as uuidv4 } from 'uuid';
-import { BookmarkPlus, LayoutTemplate, ArrowLeft, Bold, Italic, Underline, Highlighter, Eraser, Languages, Share2, FileDown, BookOpen, Library, Send, X, Loader2, Pencil, Trash2, Check, PenLine, Cloud } from 'lucide-react';
+import VocabularyEditor from './VocabularyEditor';
+import SentenceEditor from './SentenceEditor';
+import StudySidebar from './StudySidebar';
+import { noteHtml, vocabularyHtml, translationUrl } from '../lib/study';
+import { BookmarkPlus, LayoutTemplate, ArrowLeft, Bold, Italic, Underline, Highlighter, Eraser, Share2, FileDown, BookOpen, Library, Send, X, Loader2, PenLine, Cloud } from 'lucide-react';
 
 const RichTextParagraph = ({
   html,
@@ -71,9 +75,10 @@ interface ReadModeProps {
   article: Article;
   vocabularies: Vocabulary[];
   notes: Note[];
-  onAddVocabulary: (vocab: Vocabulary) => void;
+  onSaveVocabulary: (vocab: Vocabulary, mergeIntoId?: string) => void;
+  onSaveNote: (note: Note) => void;
+  onDeleteNote: (id: string) => void;
   onDeleteVocabulary: (id: string) => void;
-  onUpdateVocabulary: (vocab: Vocabulary) => void;
   onUpdateArticle?: (article: Article) => void;
   progress?: ReadingProgress;
   onProgress?: (progress: ReadingProgress) => void;
@@ -89,9 +94,10 @@ export default function ReadMode({
   onProgress,
   vocabularies,
   notes,
-  onAddVocabulary,
+  onSaveVocabulary,
+  onSaveNote,
+  onDeleteNote,
   onDeleteVocabulary,
-  onUpdateVocabulary,
   onUpdateArticle,
   onGoToLayout,
   onBack,
@@ -99,9 +105,10 @@ export default function ReadMode({
   onOpenSyncPanel,
 }: ReadModeProps) {
   const [selection, setSelection] = useState<{ text: string; rect: DOMRect; paragraphIndex: number } | null>(null);
-  const [popupMode, setPopupMode] = useState<'menu' | 'vocab'>('menu');
-  const [inputValue, setInputValue] = useState('');
-  const [selectedColor, setSelectedColor] = useState('#FF6B6B');
+  const [vocabDraft, setVocabDraft] = useState<Vocabulary | null>(null);
+  const [noteDraft, setNoteDraft] = useState<Note | null>(null);
+  const [jumpTarget, setJumpTarget] = useState<string | null>(null);
+  const jumpTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const contentRef = useRef<HTMLDivElement>(null);
 
   const paragraphs = getParagraphs(article);
@@ -142,18 +149,13 @@ export default function ReadMode({
     return () => { cancelAnimationFrame(frame); clearTimeout(timer); window.removeEventListener('scroll', onScroll); window.removeEventListener('pagehide', onPageHide); capture(); };
   }, []);
 
-  const colorOptions = ['#FF6B6B', '#4ECDC4', '#FFD93D', '#6C5CE7', '#FF8A5C'];
 
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showStudentPicker, setShowStudentPicker] = useState(false);
-  const [editingVocabId, setEditingVocabId] = useState<string | null>(null);
-  const [editingDefinition, setEditingDefinition] = useState('');
   const [students, setStudents] = useState<{ id: number; name: string }[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [pushing, setPushing] = useState('');
-  const [phonetic, setPhonetic] = useState('');
-  const [phoneticLoading, setPhoneticLoading] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const API = {
@@ -165,20 +167,6 @@ export default function ReadMode({
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
-  };
-
-  const fetchPhonetic = async (word: string) => {
-    setPhonetic('');
-    setPhoneticLoading(true);
-    try {
-      const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.trim().toLowerCase())}`);
-      if (res.ok) {
-        const data = await res.json();
-        const ipa = data[0]?.phonetic || data[0]?.phonetics?.find((p: { text?: string }) => p.text)?.text || '';
-        setPhonetic(ipa);
-      }
-    } catch { /* ignore */ }
-    setPhoneticLoading(false);
   };
 
   // Close export menu on outside click
@@ -193,19 +181,8 @@ export default function ReadMode({
   }, []);
 
   const handleExportHTML = () => {
-    const vocabHtml = vocabularies.map(v => `
-      <div style="background:#fff;padding:16px;border-radius:8px;border-left:3px solid ${v.color || '#1a1a1a'};margin-bottom:12px;">
-        <div style="font-family:Georgia,serif;font-weight:bold;font-size:18px;color:#1a1a1a;">${v.word}</div>
-        ${v.phonetic ? `<div style="font-size:13px;color:#999;margin-top:2px;">${v.phonetic}</div>` : ''}
-        <div style="font-size:14px;color:#666;margin-top:4px;">${v.definition}</div>
-        <div style="font-size:12px;color:#999;margin-top:8px;font-style:italic;">${v.context}</div>
-      </div>`).join('');
-
-    const notesHtml = notes.map(n => `
-      <div style="background:#fff;padding:16px;border-radius:8px;border-left:3px solid ${n.color || '#1a1a1a'};margin-bottom:12px;">
-        <div style="font-family:Georgia,serif;font-size:13px;color:#999;font-style:italic;margin-bottom:8px;">"${n.text}"</div>
-        <div style="font-size:14px;color:#1a1a1a;">${n.comment}</div>
-      </div>`).join('');
+    const vocabHtml = vocabularies.map(vocabularyHtml).join('');
+    const notesHtml = notes.map(noteHtml).join('');
 
     const enParas = getParagraphs(article).map(p => p.en);
     const zhParas = getParagraphs(article).map(p => p.zh);
@@ -345,7 +322,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
   useEffect(() => {
     const handleSelection = () => {
       const sel = window.getSelection();
-      if (sel && sel.toString().trim().length > 0 && contentRef.current?.contains(sel.anchorNode)) {
+      if (sel && sel.rangeCount > 0 && sel.toString().trim().length > 0 && contentRef.current?.contains(sel.anchorNode) && contentRef.current?.contains(sel.focusNode)) {
         const range = sel.getRangeAt(0);
         const rect = range.getBoundingClientRect();
         
@@ -361,16 +338,18 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
         }
 
         setSelection({ text: sel.toString().trim(), rect, paragraphIndex });
-        setPopupMode('menu');
-        setInputValue('');
       }
     };
 
-    const handleSelectionDelayed = () => setTimeout(handleSelection, 50);
+    let selectionTimer: ReturnType<typeof setTimeout> | undefined;
+    const handleSelectionDelayed = () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(handleSelection, 80); };
 
+    document.addEventListener('selectionchange', handleSelectionDelayed);
     document.addEventListener('mouseup', handleSelection);
     document.addEventListener('touchend', handleSelectionDelayed);
     return () => {
+      clearTimeout(selectionTimer);
+      document.removeEventListener('selectionchange', handleSelectionDelayed);
       document.removeEventListener('mouseup', handleSelection);
       document.removeEventListener('touchend', handleSelectionDelayed);
     };
@@ -388,21 +367,36 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleAddVocab = () => {
-    if (!selection) return;
-    onAddVocabulary({
-      id: uuidv4(),
-      word: selection.text,
-      definition: inputValue || 'Definition placeholder...',
-      context: getContextSentence(selection.text, selection.paragraphIndex),
-      paragraphIndex: selection.paragraphIndex,
-      color: selectedColor,
-      phonetic: phonetic || undefined
-    });
-    setSelection(null);
-    setPhonetic('');
-    window.getSelection()?.removeAllRanges();
+  const closeSelection = () => { setSelection(null); window.getSelection()?.removeAllRanges(); };
+  const beginVocabulary = () => {
+    const index = selection?.paragraphIndex;
+    const text = selection?.text || '';
+    const context = selection ? getContextSentence(text, selection.paragraphIndex) : '';
+    setVocabDraft({ id: uuidv4(), word: text, sourceText: text, definition: '', context, originalContext: context,
+      paragraphIndex: index, paragraphId: index !== undefined ? paragraphs[index]?.id : undefined, color: '#6b7280' });
+    closeSelection();
   };
+  const beginNote = () => {
+    const index = selection?.paragraphIndex;
+    const text = selection?.text || '';
+    setNoteDraft({ id: uuidv4(), text, originalText: text, comment: '', rewrite: '', kind: 'sentence',
+      paragraphIndex: index, paragraphId: index !== undefined ? paragraphs[index]?.id : undefined });
+    closeSelection();
+  };
+  const jumpToParagraph = (id?: string, index?: number) => {
+    const paragraph = paragraphs.find(p => p.id === id) || (index !== undefined && index >= 0 ? paragraphs[index] : undefined);
+    const target = paragraph && Array.from(contentRef.current?.querySelectorAll<HTMLElement>('[data-reading-paragraph]') || []).find(el => el.dataset.readingParagraph === paragraph.id);
+    if (!target) { showToast('原段落已更改，可通过保存的原句核对。'); return; }
+    closeSelection();
+    target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    setJumpTarget(paragraph.id); clearTimeout(jumpTimer.current); jumpTimer.current = setTimeout(() => setJumpTarget(null), 1600);
+  };
+  useEffect(() => () => clearTimeout(jumpTimer.current), []);
+  useEffect(() => {
+    const close = () => setSelection(null);
+    window.addEventListener('scroll', close, { passive: true }); window.addEventListener('resize', close);
+    return () => { window.removeEventListener('scroll', close); window.removeEventListener('resize', close); };
+  }, []);
 
   const getContextSentence = (word: string, pIdx: number) => {
     const contextParagraphs = getParagraphs(article);
@@ -434,7 +428,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
     <div className="article-content max-w-[65ch] mx-auto">
       {paragraphs.map((paragraph, idx) => {
         const visible = showAllTranslations || revealed.has(paragraph.id);
-        return <section key={paragraph.id} data-reading-paragraph={paragraph.id} className="mb-9 relative group">
+        return <section key={paragraph.id} data-reading-paragraph={paragraph.id} className={`mb-9 relative group rounded-lg transition-colors duration-500 ${jumpTarget === paragraph.id ? 'bg-amber-50 ring-4 ring-amber-50' : ''}`}>
           <div className="text-[10px] text-gray-300 font-sans mb-2 select-none">{String(idx + 1).padStart(2, '0')}</div>
           <RichTextParagraph data-paragraph-index={idx}
             className="rich-text-content text-[1.05rem] leading-[1.9] text-[#2c2c2c] outline-none focus:ring-2 focus:ring-gray-200 rounded"
@@ -581,89 +575,10 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
             {renderHighlightedText()}
           </div>
 
-          {/* Right: Sidebar */}
-          <div className="md:col-span-4 bg-[#fafafa] p-5 md:p-10 flex flex-col gap-12 border-l border-gray-100">
-            {/* Vocabulary Section */}
-            <section>
-              <div className="flex items-center justify-between mb-6">
-                <h4 className="font-sans font-bold text-gray-400 text-[10px] uppercase tracking-[0.2em] flex items-center gap-2">
-                  <BookmarkPlus className="w-3.5 h-3.5" /> Vocabulary
-                </h4>
-                <span className="text-gray-400 font-bold text-xs">{vocabularies.length}</span>
-              </div>
-              <div className="space-y-4">
-                {vocabularies.map(v => (
-                  <div key={v.id} className="group bg-white p-5 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100/50 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow border-l-[3px]" style={{ borderLeftColor: v.color || '#1a1a1a' }}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="font-bold text-lg text-[#1a1a1a] mb-1" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>{v.word}</div>
-                      {v.phonetic && <div className="text-xs text-gray-400 font-sans -mt-0.5 mb-1">{v.phonetic}</div>}
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        {editingVocabId === v.id ? (
-                          <button
-                            onClick={() => {
-                              onUpdateVocabulary({ ...v, definition: editingDefinition });
-                              setEditingVocabId(null);
-                            }}
-                            className="p-1 rounded hover:bg-green-50 text-green-500"
-                            title="保存"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setEditingVocabId(v.id);
-                              setEditingDefinition(v.definition);
-                            }}
-                            className="p-1 rounded hover:bg-gray-100 text-gray-400"
-                            title="编辑"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => onDeleteVocabulary(v.id)}
-                          className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"
-                          title="删除"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                    {editingVocabId === v.id ? (
-                      <textarea
-                        value={editingDefinition}
-                        onChange={e => setEditingDefinition(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            onUpdateVocabulary({ ...v, definition: editingDefinition });
-                            setEditingVocabId(null);
-                          }
-                          if (e.key === 'Escape') setEditingVocabId(null);
-                        }}
-                        className="w-full font-sans text-sm text-gray-600 leading-relaxed bg-gray-50 border border-gray-200 rounded px-2 py-1 resize-none focus:outline-none focus:border-gray-400"
-                        rows={2}
-                        autoFocus
-                      />
-                    ) : (
-                      <div className="font-sans text-sm text-gray-600 leading-relaxed">{v.definition}</div>
-                    )}
-                    {v.paragraphIndex !== undefined && (
-                      <div className="mt-3 text-[9px] font-bold text-gray-300 uppercase tracking-widest">
-                        Para {v.paragraphIndex + 1}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {vocabularies.length === 0 && (
-                  <div className="py-10 text-center border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
-                    <p className="text-xs text-gray-400 font-medium">Select text to add vocabulary</p>
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
+          <StudySidebar vocabularies={vocabularies} notes={notes}
+            onEditVocabulary={setVocabDraft} onDeleteVocabulary={onDeleteVocabulary}
+            onEditNote={setNoteDraft} onDeleteNote={onDeleteNote}
+            onNewVocabulary={beginVocabulary} onNewNote={beginNote} onJump={jumpToParagraph} />
         </div>
 
         {/* Selection Popup */}
@@ -671,27 +586,20 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
           <div 
             className="selection-popup fixed z-50 bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden font-sans text-sm flex flex-col animate-in fade-in zoom-in duration-200"
             style={{
-              top: Math.min(window.innerHeight - 250, selection.rect.bottom + 15),
+              top: Math.max(12, Math.min(window.innerHeight - 240, selection.rect.bottom + 12)),
               left: Math.max(20, Math.min(window.innerWidth - 280, selection.rect.left + (selection.rect.width / 2) - 130)),
-              width: '260px'
+              width: 'min(280px, calc(100vw - 32px))', maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto'
             }}
           >
-            {popupMode === 'menu' && (
               <div className="flex flex-col p-2 gap-2">
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => { setPopupMode('vocab'); if (selection) fetchPhonetic(selection.text); }}
-                    className="flex-1 h-10 rounded-xl bg-xhs-red text-white hover:bg-xhs-red/90 transition-all flex items-center justify-center gap-2 font-bold"
-                  >
-                    <BookmarkPlus className="w-4 h-4" /> 记生词
-                  </button>
+                  <button onClick={beginVocabulary} className="flex-1 h-10 rounded-xl bg-ink text-white hover:bg-black flex items-center justify-center gap-1 font-bold"><BookmarkPlus size={15} />记词汇</button>
+                  <button onClick={beginNote} className="flex-1 h-10 rounded-xl bg-gray-100 text-ink hover:bg-gray-200 flex items-center justify-center gap-1 font-bold"><PenLine size={15} />记句子</button>
                 </div>
-                <button 
-                  onClick={() => window.open(`https://translate.kagi.com/?text=${encodeURIComponent(selection.text)}`, '_blank')}
-                  className="w-full h-10 rounded-xl bg-[#F5F3FF] text-[#6366F1] hover:bg-[#EEEBFF] transition-all flex items-center justify-center gap-2 font-bold"
-                >
-                  <Languages className="w-4 h-4" /> Kagi 翻译
-                </button>
+                <div className="flex gap-2 text-xs text-gray-600">
+                  <a href={translationUrl('deepl', selection.text)} target="_blank" rel="noopener noreferrer" className="flex-1 py-2 text-center rounded-lg hover:bg-gray-100">DeepL 翻译 ↗</a>
+                  <a href={translationUrl('kagi', selection.text)} target="_blank" rel="noopener noreferrer" className="flex-1 py-2 text-center rounded-lg hover:bg-gray-100">Kagi 翻译 ↗</a>
+                </div>
                 <div className="h-px w-full bg-gray-100 my-1" />
                 <div className="flex items-center justify-between px-1">
                   <button onMouseDown={(e) => { e.preventDefault(); applyFormat('bold'); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-700 transition-colors" title="加粗"><Bold size={16}/></button>
@@ -703,52 +611,14 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
                   <button onMouseDown={(e) => { e.preventDefault(); applyFormat('removeFormat'); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors" title="清除格式"><Eraser size={16}/></button>
                 </div>
               </div>
-            )}
-
-            {popupMode === 'vocab' && (
-              <div className="p-4 flex flex-col gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-4 rounded-full" style={{ backgroundColor: selectedColor }} />
-                    <div className="font-serif font-black truncate text-lg" style={{ color: selectedColor }}>{selection.text}</div>
-                  </div>
-                  {phoneticLoading ? (
-                    <div className="text-xs text-gray-400 mt-1 ml-3">loading...</div>
-                  ) : phonetic && (
-                    <div className="text-sm text-gray-400 mt-1 ml-3 font-sans">{phonetic}</div>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {colorOptions.map(c => (
-                    <button
-                      key={c}
-                      onClick={() => setSelectedColor(c)}
-                      className="w-6 h-6 rounded-full transition-all"
-                      style={{
-                        backgroundColor: c,
-                        boxShadow: selectedColor === c ? `0 0 0 2px white, 0 0 0 4px ${c}` : 'none'
-                      }}
-                    />
-                  ))}
-                </div>
-                <input 
-                  autoFocus
-                  type="text" 
-                  placeholder="输入单词释义..." 
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  className="w-full bg-gray-50 text-ink px-4 py-3 rounded-2xl outline-none placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-xhs-red/10 transition-all"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddVocab()}
-                />
-                <div className="flex gap-2">
-                  <button onClick={() => setPopupMode('menu')} className="flex-1 h-10 rounded-xl text-gray-400 font-bold hover:bg-gray-50 transition-all">取消</button>
-                  <button onClick={handleAddVocab} className="flex-1 h-10 rounded-xl bg-xhs-red text-white font-bold hover:shadow-lg hover:shadow-xhs-red/20 transition-all">保存</button>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
+
+      {vocabDraft && <VocabularyEditor initial={vocabDraft} vocabularies={vocabularies} onClose={() => setVocabDraft(null)}
+        onSave={(value, mergeId) => { onSaveVocabulary(value, mergeId); setVocabDraft(null); showToast(mergeId ? '已合并词条，双方例句和出处均已保留' : '词汇已保存'); }} />}
+      {noteDraft && <SentenceEditor initial={noteDraft} onClose={() => setNoteDraft(null)}
+        onSave={value => { onSaveNote(value); setNoteDraft(null); showToast('句子笔记已保存'); }} />}
 
       {/* Student Picker Modal */}
       {showStudentPicker && (
