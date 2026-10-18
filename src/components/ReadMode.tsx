@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Article, Vocabulary, Note } from '../types';
+import { getParagraphs, withParagraphs, type ReadingProgress } from '../lib/library';
 import { v4 as uuidv4 } from 'uuid';
 import { BookmarkPlus, LayoutTemplate, ArrowLeft, Bold, Italic, Underline, Highlighter, Eraser, Languages, Share2, FileDown, BookOpen, Library, Send, X, Loader2, Pencil, Trash2, Check, PenLine, Cloud } from 'lucide-react';
 
@@ -44,6 +45,15 @@ const RichTextParagraph = ({
       contentEditable={true}
       suppressContentEditableWarning={true}
       onClick={(e) => e.stopPropagation()}
+      onInput={() => {
+        if (ref.current) {
+          const currentHtml = ref.current.innerHTML;
+          if (currentHtml !== lastHtmlRef.current) {
+            lastHtmlRef.current = currentHtml;
+            onChange(currentHtml);
+          }
+        }
+      }}
       onBlur={() => {
         if (ref.current) {
           const currentHtml = ref.current.innerHTML;
@@ -65,6 +75,8 @@ interface ReadModeProps {
   onDeleteVocabulary: (id: string) => void;
   onUpdateVocabulary: (vocab: Vocabulary) => void;
   onUpdateArticle?: (article: Article) => void;
+  progress?: ReadingProgress;
+  onProgress?: (progress: ReadingProgress) => void;
   onGoToLayout: () => void;
   onBack: () => void;
   syncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
@@ -73,6 +85,8 @@ interface ReadModeProps {
 
 export default function ReadMode({
   article,
+  progress,
+  onProgress,
   vocabularies,
   notes,
   onAddVocabulary,
@@ -89,6 +103,44 @@ export default function ReadMode({
   const [inputValue, setInputValue] = useState('');
   const [selectedColor, setSelectedColor] = useState('#FF6B6B');
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const paragraphs = getParagraphs(article);
+  const [showAllTranslations, setShowAllTranslations] = useState(false);
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const progressCallback = useRef(onProgress);
+  progressCallback.current = onProgress;
+  const initialProgress = useRef(progress);
+  useEffect(() => {
+    let ready = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let last = initialProgress.current ? JSON.stringify(initialProgress.current) : '';
+    const frame = requestAnimationFrame(() => {
+      const saved = initialProgress.current;
+      const target = saved && Array.from(contentRef.current?.querySelectorAll<HTMLElement>('[data-reading-paragraph]') || [])
+        .find(el => el.dataset.readingParagraph === saved.paragraphId);
+      if (target) window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY + saved!.offset));
+      else window.scrollTo(0, 0);
+      ready = true;
+    });
+    let pending: ReadingProgress | null = null;
+    const measure = () => {
+      if (!ready) return;
+      const elements = Array.from(contentRef.current?.querySelectorAll<HTMLElement>('[data-reading-paragraph]') || []);
+      const target = elements.find(el => el.getBoundingClientRect().bottom > 100) || elements.at(-1);
+      if (target) pending = { paragraphId: target.dataset.readingParagraph!, offset: -target.getBoundingClientRect().top };
+    };
+    const capture = () => {
+      if (!pending) return;
+      const value = JSON.stringify(pending);
+      if (last !== value) { last = value; progressCallback.current?.(pending); }
+      pending = null;
+    };
+    const onScroll = () => { measure(); clearTimeout(timer); timer = setTimeout(capture, 350); };
+    const onPageHide = () => { measure(); capture(); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('pagehide', onPageHide);
+    return () => { cancelAnimationFrame(frame); clearTimeout(timer); window.removeEventListener('scroll', onScroll); window.removeEventListener('pagehide', onPageHide); capture(); };
+  }, []);
 
   const colorOptions = ['#FF6B6B', '#4ECDC4', '#FFD93D', '#6C5CE7', '#FF8A5C'];
 
@@ -155,8 +207,8 @@ export default function ReadMode({
         <div style="font-size:14px;color:#1a1a1a;">${n.comment}</div>
       </div>`).join('');
 
-    const enParas = article.body.split(/\n+/).filter(p => p.trim());
-    const zhParas = article.translationBody ? article.translationBody.split(/\n+/).filter(p => p.trim()) : [];
+    const enParas = getParagraphs(article).map(p => p.en);
+    const zhParas = getParagraphs(article).map(p => p.zh);
     const bodyHtml = enParas.map((en, i) => `
       <div style="margin-bottom:24px;">
         <p style="font-family:Georgia,serif;font-size:16px;line-height:1.8;color:#2c2c2c;">${en}</p>
@@ -353,8 +405,8 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
   };
 
   const getContextSentence = (word: string, pIdx: number) => {
-    const paragraphs = article.body.split(/\n+/).filter(p => p.trim());
-    const targetP = paragraphs[pIdx] || article.body;
+    const contextParagraphs = getParagraphs(article);
+    const targetP = contextParagraphs[pIdx]?.en || article.body;
     const plain = targetP.replace(/<[^>]*>/g, '');
     const sentences = plain.match(/[^.!?]+[.!?]+/g) || [plain];
     const sentence = sentences.find(s => s.includes(word));
@@ -365,61 +417,48 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
     document.execCommand(command, false, value);
   };
 
-  const handleEnEdit = (idx: number, newHtml: string) => {
+  const editParagraph = (idx: number, language: 'en' | 'zh', html: string) => {
     if (!onUpdateArticle) return;
-    const paras = article.body.split(/\n+/).filter(p => p.trim());
-    paras[idx] = newHtml;
-    onUpdateArticle({
-      ...article,
-      body: paras.join('\n\n')
-    });
+    onUpdateArticle(withParagraphs(article, paragraphs.map((p, i) => i === idx ? { ...p, [language]: html } : p)));
+  };
+  const handleEnEdit = (idx: number, html: string) => editParagraph(idx, 'en', html);
+  const handleZhEdit = (idx: number, html: string) => editParagraph(idx, 'zh', html);
+  const swapTranslation = (index: number, otherIndex: number) => {
+    if (!onUpdateArticle || otherIndex < 0 || otherIndex >= paragraphs.length) return;
+    const next = paragraphs.map(p => ({ ...p }));
+    [next[index].zh, next[otherIndex].zh] = [next[otherIndex].zh, next[index].zh];
+    onUpdateArticle(withParagraphs(article, next));
   };
 
-  const handleZhEdit = (idx: number, newHtml: string) => {
-    if (!onUpdateArticle) return;
-    const paras = article.translationBody ? article.translationBody.split(/\n+/).filter(p => p.trim()) : [];
-    // Extend array if editing a paragraph beyond current length
-    while (paras.length <= idx) paras.push('');
-    paras[idx] = newHtml;
-    onUpdateArticle({
-      ...article,
-      translationBody: paras.join('\n\n')
-    });
-  };
-
-  // Highlight words in the text
-  const renderHighlightedText = () => {
-    const enParas = article.body.split(/\n+/).filter(p => p.trim());
-    const zhParas = article.translationBody ? article.translationBody.split(/\n+/).filter(p => p.trim()) : [];
-    const maxLen = Math.max(enParas.length, zhParas.length);
-
-    return (
-      <div className="article-content md:columns-2" style={{ columnGap: '2.5rem' }}>
-        {Array.from({ length: maxLen }).map((_, idx) => {
-          return (
-            <div key={idx} className="mb-8 break-inside-avoid relative group">
-              <RichTextParagraph
-                data-paragraph-index={idx}
-                className="rich-text-content text-[1.05rem] leading-[1.8] text-[#2c2c2c] hover:text-black transition-colors outline-none focus:ring-2 focus:ring-gray-200 rounded hover:bg-black/5"
-                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-                html={enParas[idx] || ''}
-                onChange={(newHtml) => handleEnEdit(idx, newHtml)}
-              />
-              {article.translationBody !== undefined && (
-                <RichTextParagraph
-                  data-paragraph-index={idx}
-                  data-placeholder="输入中文翻译..."
-                  className="rich-text-content font-sans text-[0.95rem] leading-[1.7] text-gray-500 pt-3 break-words outline-none focus:ring-2 focus:ring-gray-200 rounded hover:bg-black/5"
-                  html={zhParas[idx] || ''}
-                  onChange={(newHtml) => handleZhEdit(idx, newHtml)}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  const renderHighlightedText = () => (
+    <div className="article-content max-w-[65ch] mx-auto">
+      {paragraphs.map((paragraph, idx) => {
+        const visible = showAllTranslations || revealed.has(paragraph.id);
+        return <section key={paragraph.id} data-reading-paragraph={paragraph.id} className="mb-9 relative group">
+          <div className="text-[10px] text-gray-300 font-sans mb-2 select-none">{String(idx + 1).padStart(2, '0')}</div>
+          <RichTextParagraph data-paragraph-index={idx}
+            className="rich-text-content text-[1.05rem] leading-[1.9] text-[#2c2c2c] outline-none focus:ring-2 focus:ring-gray-200 rounded"
+            style={{ fontFamily: 'Georgia, "Times New Roman", serif' }} html={paragraph.en} onChange={html => handleEnEdit(idx, html)} />
+          <button type="button" aria-expanded={visible} onClick={() => {
+            if (showAllTranslations) { setShowAllTranslations(false); setRevealed(new Set(paragraphs.filter(p => p.id !== paragraph.id).map(p => p.id))); }
+            else setRevealed(current => { const next = new Set(current); if (next.has(paragraph.id)) next.delete(paragraph.id); else next.add(paragraph.id); return next; });
+          }} className="mt-3 text-xs font-sans text-gray-400 hover:text-ink py-1">
+            {visible ? '收起译文' : paragraph.zh ? '查看译文' : '补充译文'}
+          </button>
+          {visible && <div className="mt-1 pl-4 border-l-2 border-gray-100">
+            <RichTextParagraph data-paragraph-index={idx} data-placeholder="这一段暂时没有译文，点击填写…"
+              className="rich-text-content font-sans text-[0.95rem] leading-[1.8] text-gray-500 min-h-8 outline-none focus:ring-2 focus:ring-gray-200 rounded"
+              html={paragraph.zh} onChange={html => handleZhEdit(idx, html)} />
+            {paragraphs.length > 1 && <div className="flex gap-3 mt-2 text-[11px] text-gray-400 font-sans">
+              <span>译文对齐：</span>
+              <button type="button" disabled={idx === 0} onClick={() => swapTranslation(idx, idx - 1)} className="hover:text-ink disabled:opacity-30" aria-label={`第 ${idx + 1} 段译文上移`}>与上一段交换</button>
+              <button type="button" disabled={idx === paragraphs.length - 1} onClick={() => swapTranslation(idx, idx + 1)} className="hover:text-ink disabled:opacity-30" aria-label={`第 ${idx + 1} 段译文下移`}>与下一段交换</button>
+            </div>}
+          </div>}
+        </section>;
+      })}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#eef0f2] py-8 md:py-12 pb-32">
@@ -456,6 +495,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
         <header className="p-5 md:p-12 border-b border-gray-200">
           <div className="flex justify-between items-start mb-10">
             <button 
+              aria-label="返回书架"
               onClick={onBack} 
               className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-500 hover:text-black hover:bg-gray-100 transition-all"
             >
@@ -486,6 +526,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
               </button>
               <div className="relative" ref={exportMenuRef}>
                 <button
+                  aria-label="导出和分享"
                   onClick={() => setShowExportMenu(!showExportMenu)}
                   className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-500 hover:text-black hover:bg-gray-100 transition-all"
                 >
@@ -527,6 +568,12 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
           </div>
         </header>
 
+        <div className="px-5 md:px-12 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 font-sans text-xs text-gray-400">
+          <span>先读原文，再逐段核对译文 · 阅读位置自动保存</span>
+          <button type="button" onClick={() => { setShowAllTranslations(!showAllTranslations); setRevealed(new Set()); }} className="text-gray-600 hover:text-ink underline underline-offset-4">
+            {showAllTranslations ? '隐藏全部译文' : '显示全部译文'}
+          </button>
+        </div>
         {/* Core Layout */}
         <div className="grid grid-cols-1 md:grid-cols-12 min-h-[500px]">
           {/* Left: Main Content */}

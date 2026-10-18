@@ -1,4 +1,11 @@
+export interface Paragraph {
+  id: string;
+  en: string;
+  zh: string;
+}
+
 export interface Article {
+  paragraphs?: Paragraph[];
   title: string;
   subtitle: string;
   body: string;
@@ -27,6 +34,6 @@ export interface Note {
   color?: string;
 }
 
-export type AppMode = 'input' | 'read' | 'layout';
+export type AppMode = 'library' | 'input' | 'read' | 'layout';
 
 export type DesignStyle = 'academic' | 'editorial' | 'handwritten';

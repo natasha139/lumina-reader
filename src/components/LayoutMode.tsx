@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Article, Vocabulary, Note, DesignStyle } from '../types';
 import html2canvas from 'html2canvas';
+import { getParagraphs, withParagraphs } from '../lib/library';
 import { Download, ArrowLeft, Loader2, Bold, Italic, Underline, Highlighter, Eraser, GraduationCap, Newspaper, PenTool } from 'lucide-react';
 
 const RichTextParagraph = ({
@@ -38,6 +39,15 @@ const RichTextParagraph = ({
       contentEditable={true}
       suppressContentEditableWarning={true}
       onClick={(e) => e.stopPropagation()}
+      onInput={() => {
+        if (ref.current) {
+          const currentHtml = ref.current.innerHTML;
+          if (currentHtml !== lastHtmlRef.current) {
+            lastHtmlRef.current = currentHtml;
+            onChange(currentHtml);
+          }
+        }
+      }}
       onBlur={() => {
         if (ref.current) {
           const currentHtml = ref.current.innerHTML;
@@ -73,13 +83,13 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
   const [showIframeWarning, setShowIframeWarning] = useState(false);
   const [designStyle, setDesignStyle] = useState<DesignStyle>('academic');
 
-  const [localEnParas, setLocalEnParas] = useState<string[]>(() => article.body.split(/\n+/).filter(p => p.trim()));
-  const [localZhParas, setLocalZhParas] = useState<string[]>(() => article.translationBody ? article.translationBody.split(/\n+/).filter(p => p.trim()) : []);
+  const [localEnParas, setLocalEnParas] = useState<string[]>(() => getParagraphs(article).map(p => p.en));
+  const [localZhParas, setLocalZhParas] = useState<string[]>(() => getParagraphs(article).map(p => p.zh));
   const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
 
   useEffect(() => {
-    setLocalEnParas(article.body.split(/\n+/).filter(p => p.trim()));
-    setLocalZhParas(article.translationBody ? article.translationBody.split(/\n+/).filter(p => p.trim()) : []);
+    setLocalEnParas(getParagraphs(article).map(p => p.en));
+    setLocalZhParas(getParagraphs(article).map(p => p.zh));
   }, [article.body, article.translationBody]);
 
   const pages = useMemo(() => {
@@ -148,14 +158,14 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
     const newParas = [...localEnParas];
     newParas[idx] = newHtml;
     setLocalEnParas(newParas);
-    if (onUpdateArticle) onUpdateArticle({ ...article, body: newParas.join('\n\n') });
+    if (onUpdateArticle) onUpdateArticle(withParagraphs(article, getParagraphs(article).map((p, i) => i === idx ? { ...p, en: newHtml } : p)));
   };
 
   const handleZhEdit = (idx: number, newHtml: string) => {
     const newParas = [...localZhParas];
     newParas[idx] = newHtml;
     setLocalZhParas(newParas);
-    if (onUpdateArticle) onUpdateArticle({ ...article, translationBody: newParas.join('\n\n') });
+    if (onUpdateArticle) onUpdateArticle(withParagraphs(article, getParagraphs(article).map((p, i) => i === idx ? { ...p, zh: newHtml } : p)));
   };
 
   const handleExport = async () => {

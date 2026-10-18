@@ -14,9 +14,9 @@ export default function SyncPanel({ syncCode, onLinkDevice, onClose }: SyncPanel
   const [linkSuccess, setLinkSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!syncCode) return;
-    navigator.clipboard.writeText(syncCode);
+    try { await navigator.clipboard.writeText(syncCode); } catch { setLinkError('无法自动复制，请手动复制同步码。'); return; }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -47,9 +47,10 @@ export default function SyncPanel({ syncCode, onLinkDevice, onClose }: SyncPanel
       >
         <button
           onClick={onClose}
+          aria-label="关闭同步面板"
           className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 transition-all"
         >
-          <X className="w-4 h-4" />
+          <X aria-label="关闭同步面板" className="w-4 h-4" />
         </button>
 
         <div className="flex items-center gap-3 mb-6">
@@ -58,7 +59,7 @@ export default function SyncPanel({ syncCode, onLinkDevice, onClose }: SyncPanel
           </div>
           <div>
             <h2 className="font-sans font-black text-ink text-base">跨设备同步</h2>
-            <p className="text-gray-400 text-xs mt-0.5">在另一台设备上输入同步码即可共享数据</p>
+            <p className="text-gray-400 text-xs mt-0.5">使用同一同步码共享文章库；切换设备后自动拉取更新。</p>
           </div>
         </div>
 
@@ -79,7 +80,7 @@ export default function SyncPanel({ syncCode, onLinkDevice, onClose }: SyncPanel
             </div>
           ) : (
             <div className="bg-gray-50 rounded-2xl px-5 py-3 text-center text-gray-400 text-sm">
-              保存一篇文章后自动生成
+              联网后自动生成
             </div>
           )}
         </div>
@@ -111,6 +112,7 @@ export default function SyncPanel({ syncCode, onLinkDevice, onClose }: SyncPanel
           >
             {linkSuccess ? <><Check className="w-4 h-4" /> 同步成功</> : linking ? '同步中...' : <><Link className="w-4 h-4" /> 连接此设备</>}
           </button>
+          <p className="text-xs text-gray-400 mt-3 leading-relaxed">连接时会合并本机文章，原有内容不会清空。同步码可访问整个文章库，请只在自己的设备上使用。</p>
           {linkError && <p className="text-red-400 text-xs mt-2 ml-1">{linkError}</p>}
           {linkSuccess && <p className="text-green-500 text-xs mt-2 ml-1">正在跳转...</p>}
         </div>

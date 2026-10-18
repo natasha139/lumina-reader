@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Article } from '../types';
+import type { ReadingStatus } from '../lib/library';
 import { BookOpen, Image as ImageIcon, Languages, History, Cloud } from 'lucide-react';
 
 interface InputModeProps {
-  onStartReading: (article: Article) => void;
+  onStartReading: (article: Article, status?: ReadingStatus) => void;
+  onBack?: () => void;
   hasSavedSession?: boolean;
   onLoadSession?: () => void;
   initialArticle?: Article | null;
@@ -12,7 +14,7 @@ interface InputModeProps {
   onOpenSyncPanel?: () => void;
 }
 
-export default function InputMode({ onStartReading, hasSavedSession, onLoadSession, initialArticle, syncCode, syncStatus, onOpenSyncPanel }: InputModeProps) {
+export default function InputMode({ onStartReading, onBack, hasSavedSession, onLoadSession, initialArticle, syncCode, syncStatus, onOpenSyncPanel }: InputModeProps) {
   const [title, setTitle] = useState(initialArticle?.title || '');
   const [subtitle, setSubtitle] = useState(initialArticle?.subtitle || '');
   const [body, setBody] = useState(initialArticle?.body || '');
@@ -23,7 +25,7 @@ export default function InputMode({ onStartReading, hasSavedSession, onLoadSessi
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !body) return;
+    if (!title.trim() || !body.trim()) return;
 
     const wordCount = body.trim().split(/\s+/).length;
     const date = new Date().toLocaleDateString('en-US', {
@@ -33,19 +35,20 @@ export default function InputMode({ onStartReading, hasSavedSession, onLoadSessi
     });
 
     onStartReading({
-      title,
+      title: title.trim(),
       subtitle,
       body,
-      translationBody: isBilingual && translationBody.trim() ? translationBody : undefined,
+      translationBody: isBilingual ? translationBody : undefined,
       date,
       difficulty,
       wordCount,
       imageUrl: imageUrl || 'https://picsum.photos/seed/reading/800/600',
-    });
+    }, (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'unread' ? 'unread' : 'reading');
   };
 
   return (
     <div className="max-w-4xl mx-auto p-8 pb-20">
+      {onBack && <button type="button" onClick={onBack} className="text-sm text-gray-500 mb-6 hover:text-ink">← 返回书架</button>}
       <div className="mb-12 text-center">
         <div className="inline-block px-4 py-1.5 rounded-full bg-xhs-red/5 text-xhs-red text-xs font-black mb-6 tracking-[0.2em] uppercase">
           Lumina Reader v2.0
@@ -186,19 +189,21 @@ export default function InputMode({ onStartReading, hasSavedSession, onLoadSessi
                 <div className="text-[10px] font-black text-gray-300 uppercase tracking-widest ml-2">Translation</div>
                 <textarea
                   id="translationBody"
-                  required={isBilingual}
+                  aria-label="中文译文"
                   value={translationBody}
                   onChange={(e) => setTranslationBody(e.target.value)}
                   rows={12}
                   className="w-full px-6 py-5 rounded-[2rem] bg-gray-50 border-transparent focus:bg-white focus:border-xhs-red/20 focus:ring-4 focus:ring-xhs-red/5 outline-none transition-all font-intl text-base leading-relaxed resize-none"
-                  placeholder="在此粘贴中文译文。请确保段落换行与原文一一对应..."
+                  placeholder="可稍后逐段填写译文。批量粘贴时请与英文段落顺序一致..."
                 />
               </div>
             )}
           </div>
         </div>
 
+        <p className="text-xs text-gray-500 leading-relaxed">导入后可逐段补译；缺少的译文会保留空位。若原文与译文分段不同，请先核对每段对应关系。</p>
         <div className="pt-6">
+          <button type="submit" value="unread" className="library-secondary w-full mb-3">保存到待读</button>
           <button
             type="submit"
             className="w-full bg-xhs-red text-white font-sans font-black py-5 rounded-2xl hover:shadow-2xl hover:shadow-xhs-red/30 transition-all flex items-center justify-center gap-3 text-xl tracking-tight"

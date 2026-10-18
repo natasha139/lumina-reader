@@ -1,218 +1,65 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AppMode, Article, Vocabulary, Note } from './types';
+import React, { useCallback, useState } from 'react';
+import type { AppMode, Article, Vocabulary } from './types';
 import InputMode from './components/InputMode';
 import ReadMode from './components/ReadMode';
 import LayoutMode from './components/LayoutMode';
 import SyncPanel from './components/SyncPanel';
-
-const API_BASE = '/api/session';
-
-function getOrCreateUserId(): string {
-  let id = localStorage.getItem('lumina-user-id');
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem('lumina-user-id', id);
-  }
-  return id;
-}
-
-interface SessionData {
-  article: Article;
-  vocabularies: Vocabulary[];
-  notes: Note[];
-}
+import ArticleLibrary from './components/ArticleLibrary';
+import { useReadingLibrary } from './lib/useReadingLibrary';
+import { emptyLibrary, getParagraphs, mergeLibraries, withParagraphs, type LibraryEntry, type ReadingProgress, type ReadingStatus } from './lib/library';
 
 export default function App() {
-  const [mode, setMode] = useState<AppMode>('input');
-  const [article, setArticle] = useState<Article | null>(null);
-  const [vocabularies, setVocabularies] = useState<Vocabulary[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [hasSavedSession, setHasSavedSession] = useState(false);
-  const [syncCode, setSyncCode] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [mode, setMode] = useState<AppMode>('library');
   const [showSyncPanel, setShowSyncPanel] = useState(false);
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const userId = useRef(getOrCreateUserId());
-
-  // 启动时从云端拉取，没有则用 localStorage
-  useEffect(() => {
-    async function loadSession() {
-      try {
-        const res = await fetch(`${API_BASE}?user_id=${userId.current}`);
-        const data = await res.json();
-        if (data.found && data.session?.article) {
-          const { article: a, vocabularies: v, notes: n } = data.session as SessionData;
-          setArticle(a);
-          setVocabularies(v || []);
-          setNotes(n || []);
-          setHasSavedSession(true);
-          setSyncCode(data.sync_code);
-          // 同步到 localStorage 作为离线缓存
-          localStorage.setItem('lumina-reader-session', JSON.stringify(data.session));
-          return;
-        }
-      } catch {
-        // 云端失败，降级到 localStorage
-      }
-      // 降级：读 localStorage
-      const saved = localStorage.getItem('lumina-reader-session');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved) as SessionData;
-          if (parsed.article) {
-            setArticle(parsed.article);
-            setVocabularies(parsed.vocabularies || []);
-            setNotes(parsed.notes || []);
-            setHasSavedSession(true);
-          }
-        } catch { /* ignore */ }
-      }
-    }
-    loadSession();
-  }, []);
-
-  // 数据变化时 debounce 同步到云端
-  const syncToCloud = useCallback((session: SessionData, currentSyncCode: string | null) => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(async () => {
-      setSyncStatus('syncing');
-      try {
-        const res = await fetch(API_BASE, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: userId.current,
-            session,
-            sync_code: currentSyncCode ?? undefined,
-          }),
-        });
-        const data = await res.json();
-        if (data.ok) {
-          setSyncCode(data.sync_code);
-          setSyncStatus('synced');
-        } else {
-          setSyncStatus('error');
-        }
-      } catch {
-        setSyncStatus('error');
-      }
-    }, 3000);
-  }, []);
-
-  useEffect(() => {
-    if (article) {
-      const session: SessionData = { article, vocabularies, notes };
-      localStorage.setItem('lumina-reader-session', JSON.stringify(session));
-      setHasSavedSession(true);
-      syncToCloud(session, syncCode);
-    }
-  }, [article, vocabularies, notes]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleLoadSession = () => {
-    const saved = localStorage.getItem('lumina-reader-session');
-    if (saved) {
-      try {
-        const { article: a, vocabularies: v, notes: n } = JSON.parse(saved) as SessionData;
-        if (a) {
-          setArticle(a);
-          setVocabularies(v || []);
-          setNotes(n || []);
-          setMode('read');
-        }
-      } catch { /* ignore */ }
-    }
-  };
-
-  // 用同步码绑定设备，拉取对方数据
-  const handleLinkDevice = async (code: string): Promise<{ ok: boolean; error?: string }> => {
-    try {
-      const res = await fetch(`${API_BASE}/link`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId.current, sync_code: code }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        return { ok: false, error: data.error || '同步码无效' };
-      }
-      const session = data.session as SessionData;
-      if (session?.article) {
-        setArticle(session.article);
-        setVocabularies(session.vocabularies || []);
-        setNotes(session.notes || []);
-        setHasSavedSession(true);
-        setMode('read');
-        localStorage.setItem('lumina-reader-session', JSON.stringify(session));
-      }
-      setSyncCode(data.sync_code);
-      return { ok: true };
-    } catch {
-      return { ok: false, error: '网络错误，请重试' };
-    }
-  };
-
-  const handleStartReading = (newArticle: Article) => {
-    setArticle(newArticle);
-    setVocabularies([]);
-    setNotes([]);
+  const { library, update, status, message, storageError, syncCode, sync, linkDevice } = useReadingLibrary();
+  const entry = library.entries.find(e => e.id === library.activeId);
+  const patchEntry = useCallback((id: string, fn: (entry: LibraryEntry) => LibraryEntry) => {
+    update(current => ({ ...current, entries: current.entries.map(e => e.id === id ? { ...fn(e), updatedAt: Date.now() } : e) }));
+  }, [update]);
+  const open = (id: string) => {
+    update(current => ({ ...current, activeId: id, entries: current.entries.map(e => e.id === id && e.status === 'unread' ? { ...e, status: 'reading', updatedAt: Date.now() } : e) }));
     setMode('read');
   };
+  const start = (article: Article, readingStatus: ReadingStatus = 'reading') => {
+    const id = crypto.randomUUID();
+    const newEntry: LibraryEntry = { id, article: withParagraphs(article, getParagraphs(article)), vocabularies: [], notes: [], status: readingStatus, updatedAt: Date.now() };
+    update(current => ({ ...current, activeId: readingStatus === 'unread' ? (current.activeId || id) : id, entries: [...current.entries, newEntry] }));
+    setMode(readingStatus === 'unread' ? 'library' : 'read');
+    window.scrollTo(0, 0);
+  };
+  const progress = useCallback((position: ReadingProgress) => {
+    if (library.activeId) patchEntry(library.activeId, e => ({ ...e, progress: position }));
+  }, [library.activeId, patchEntry]);
+  const updateArticle = (article: Article) => { if (entry) patchEntry(entry.id, e => ({ ...e, article })); };
+  const back = () => { setMode('library'); window.scrollTo(0, 0); };
 
-  const handleAddVocabulary = (vocab: Vocabulary) => setVocabularies(prev => [...prev, vocab]);
-  const handleDeleteVocabulary = (id: string) => setVocabularies(prev => prev.filter(v => v.id !== id));
-  const handleUpdateVocabulary = (updated: Vocabulary) => setVocabularies(prev => prev.map(v => v.id === updated.id ? updated : v));
-  const handleAddNote = (note: Note) => setNotes(prev => [...prev, note]);
-  const handleDeleteNote = (id: string) => setNotes(prev => prev.filter(n => n.id !== id));
-  const handleUpdateNote = (updated: Note) => setNotes(prev => prev.map(n => n.id === updated.id ? updated : n));
-  const handleUpdateArticle = (updatedArticle: Article) => setArticle(updatedArticle);
-
-  return (
-    <div className="min-h-screen font-sans selection:bg-highlight selection:text-ink">
-      {mode === 'input' && (
-        <InputMode
-          onStartReading={handleStartReading}
-          hasSavedSession={hasSavedSession}
-          onLoadSession={handleLoadSession}
-          initialArticle={article}
-          syncCode={syncCode}
-          syncStatus={syncStatus}
-          onOpenSyncPanel={() => setShowSyncPanel(true)}
-        />
-      )}
-
-      {mode === 'read' && article && (
-        <ReadMode
-          article={article}
-          vocabularies={vocabularies}
-          notes={notes}
-          onAddVocabulary={handleAddVocabulary}
-          onDeleteVocabulary={handleDeleteVocabulary}
-          onUpdateVocabulary={handleUpdateVocabulary}
-          onUpdateArticle={handleUpdateArticle}
-          onGoToLayout={() => setMode('layout')}
-          onBack={() => setMode('input')}
-          syncStatus={syncStatus}
-          onOpenSyncPanel={() => setShowSyncPanel(true)}
-        />
-      )}
-
-      {mode === 'layout' && article && (
-        <LayoutMode
-          article={article}
-          vocabularies={vocabularies}
-          notes={notes}
-          onUpdateArticle={handleUpdateArticle}
-          onBack={() => setMode('read')}
-        />
-      )}
-
-      {showSyncPanel && (
-        <SyncPanel
-          syncCode={syncCode}
-          onLinkDevice={handleLinkDevice}
-          onClose={() => setShowSyncPanel(false)}
-        />
-      )}
-    </div>
-  );
+  return <div className="min-h-screen font-sans selection:bg-highlight selection:text-ink">
+    {mode === 'library' && <ArticleLibrary library={library} onOpen={open} onNew={() => { setMode('input'); window.scrollTo(0, 0); }}
+      onStatus={(id, value) => patchEntry(id, e => ({ ...e, status: value }))}
+      onImport={imported => update(current => mergeLibraries(emptyLibrary(), imported, current))}
+      onSync={() => void sync()} onOpenSync={() => setShowSyncPanel(true)} syncStatus={status} syncMessage={message} storageError={storageError} />}
+    {mode !== 'library' && (message || storageError) && <div role="status" className="bg-amber-50 text-amber-800 text-sm p-3 text-center">
+      {storageError || message} <button className="underline ml-3" onClick={() => void sync()}>重试同步</button>
+      <button className="underline ml-3" onClick={back}>返回书架备份</button>
+    </div>}
+    {mode === 'input' && <InputMode onStartReading={start} onBack={back} syncCode={syncCode} syncStatus={status} onOpenSyncPanel={() => setShowSyncPanel(true)} />}
+    {(mode === 'read' || mode === 'layout') && entry && <>
+      <div className="sticky top-0 z-40 bg-cream max-w-5xl mx-auto px-5 py-3 flex justify-between items-center gap-3 text-sm">
+        <button onClick={back} className="text-gray-500 hover:text-ink">← 我的书架</button>
+        <label className="flex gap-2 items-center text-gray-500">阅读状态
+          <select aria-label="当前文章阅读状态" value={entry.status} onChange={e => patchEntry(entry.id, item => ({ ...item, status: e.target.value as ReadingStatus }))} className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+            <option value="unread">待读</option><option value="reading">精读中</option><option value="completed">已完成</option>
+          </select>
+        </label>
+      </div>
+      {mode === 'read' && <ReadMode key={entry.id} article={entry.article} vocabularies={entry.vocabularies} notes={entry.notes}
+        onAddVocabulary={(vocab: Vocabulary) => patchEntry(entry.id, e => ({ ...e, vocabularies: [...e.vocabularies, vocab] }))}
+        onDeleteVocabulary={id => patchEntry(entry.id, e => ({ ...e, vocabularies: e.vocabularies.filter(v => v.id !== id) }))}
+        onUpdateVocabulary={vocab => patchEntry(entry.id, e => ({ ...e, vocabularies: e.vocabularies.map(v => v.id === vocab.id ? vocab : v) }))}
+        onUpdateArticle={updateArticle} onGoToLayout={() => { setMode('layout'); window.scrollTo(0, 0); }} onBack={back}
+        progress={entry.progress} onProgress={progress} syncStatus={status} onOpenSyncPanel={() => setShowSyncPanel(true)} />}
+      {mode === 'layout' && <LayoutMode key={entry.id} article={entry.article} vocabularies={entry.vocabularies} notes={entry.notes} onUpdateArticle={updateArticle} onBack={() => setMode('read')} />}
+    </>}
+    {showSyncPanel && <SyncPanel syncCode={syncCode} onLinkDevice={linkDevice} onClose={() => setShowSyncPanel(false)} />}
+  </div>;
 }
