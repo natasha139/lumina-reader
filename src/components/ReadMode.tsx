@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Article, Vocabulary, Note } from '../types';
+import { Article, Vocabulary, Note, Retell } from '../types';
 import { getParagraphs, withParagraphs, type ReadingProgress } from '../lib/library';
 import { v4 as uuidv4 } from 'uuid';
+import RetellPanel from './RetellPanel';
+import { retellHtml } from '../lib/retell';
 import VocabularyEditor from './VocabularyEditor';
 import SentenceEditor from './SentenceEditor';
 import StudySidebar from './StudySidebar';
@@ -75,6 +77,8 @@ interface ReadModeProps {
   article: Article;
   vocabularies: Vocabulary[];
   notes: Note[];
+  retell?: Retell;
+  onRetellChange: (retell: Retell) => void;
   onSaveVocabulary: (vocab: Vocabulary, mergeIntoId?: string) => void;
   onSaveNote: (note: Note) => void;
   onDeleteNote: (id: string) => void;
@@ -94,6 +98,8 @@ export default function ReadMode({
   onProgress,
   vocabularies,
   notes,
+  retell,
+  onRetellChange,
   onSaveVocabulary,
   onSaveNote,
   onDeleteNote,
@@ -205,7 +211,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
 <div class="sidebar">
 <div><div class="section-title">Vocabulary (${vocabularies.length})</div>${vocabHtml || '<p style="color:#ccc;">No vocabulary saved</p>'}</div>
 <div><div class="section-title">Notes (${notes.length})</div>${notesHtml || '<p style="color:#ccc;">No notes saved</p>'}</div>
-</div></body></html>`;
+</div>${retellHtml(retell)}</body></html>`;
 
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
@@ -516,7 +522,7 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
                 onClick={onGoToLayout}
                 className="bg-[#1a1a1a] text-white px-5 py-2 rounded-full hover:bg-black transition-all flex items-center gap-2 font-sans text-xs font-bold tracking-wide"
               >
-                <LayoutTemplate className="w-4 h-4" /> 生成海报
+                <LayoutTemplate className="w-4 h-4" /> 排版与导出
               </button>
               <div className="relative" ref={exportMenuRef}>
                 <button
@@ -619,6 +625,8 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
         onSave={(value, mergeId) => { onSaveVocabulary(value, mergeId); setVocabDraft(null); showToast(mergeId ? '已合并词条，双方例句和出处均已保留' : '词汇已保存'); }} />}
       {noteDraft && <SentenceEditor initial={noteDraft} onClose={() => setNoteDraft(null)}
         onSave={value => { onSaveNote(value); setNoteDraft(null); showToast('句子笔记已保存'); }} />}
+
+      <RetellPanel value={retell} onChange={onRetellChange} vocabularies={vocabularies} />
 
       {/* Student Picker Modal */}
       {showStudentPicker && (

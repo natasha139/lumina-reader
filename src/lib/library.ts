@@ -1,4 +1,5 @@
-import type { Article, Vocabulary, Note } from '../types';
+import { normalizeRetell } from './retell';
+import type { Article, Vocabulary, Note, Retell } from '../types';
 
 export type ReadingStatus = 'unread' | 'reading' | 'completed';
 export interface ReadingProgress { paragraphId: string; offset: number }
@@ -8,6 +9,7 @@ export interface LibraryEntry {
   vocabularies: Vocabulary[];
   notes: Note[];
   status: ReadingStatus;
+  retell?: Retell;
   updatedAt: number;
   trashedAt?: number;
   progress?: ReadingProgress;
@@ -62,7 +64,7 @@ export function normalizeLibrary(value: unknown): ReadingLibrary {
   if (!Array.isArray(v.entries)) return emptyLibrary();
   const entries = v.entries.filter(e => e && typeof e.id === 'string' && e.article &&
     typeof e.article.body === 'string' && typeof e.article.title === 'string').map(e => ({
-      ...e, article: withParagraphs(e.article, getParagraphs(e.article)),
+      ...e, ...(e.retell ? { retell: normalizeRetell(e.retell) } : {}), article: withParagraphs(e.article, getParagraphs(e.article)),
       vocabularies: Array.isArray(e.vocabularies) ? e.vocabularies : [],
       notes: Array.isArray(e.notes) ? e.notes : [],
       status: ['unread', 'reading', 'completed'].includes(e.status) ? e.status : 'unread' as ReadingStatus,
@@ -72,7 +74,7 @@ export function normalizeLibrary(value: unknown): ReadingLibrary {
 }
 
 const fingerprint = (entry: LibraryEntry | undefined) => entry ? JSON.stringify({
-  article: entry.article, vocabularies: entry.vocabularies, notes: entry.notes, status: entry.status, trashedAt: entry.trashedAt,
+  article: entry.article, vocabularies: entry.vocabularies, notes: entry.notes, status: entry.status, trashedAt: entry.trashedAt, retell: entry.retell,
 }) : '';
 
 // Three-way merge: edits to different articles combine; concurrent edits to one

@@ -66,3 +66,17 @@ retained until restored, including across device synchronization. No permanent
 purge is provided. Importing the same English body prompts the user to open the
 existing article or explicitly keep another version; same titles alone do not
 cause automatic merging or removal.
+
+### PDF sources and read-after retelling
+
+The reader now has a per-article retelling area: main idea, argument structure,
+English retelling and expressions to reuse. Drafts save locally and synchronize
+with the library; concurrent edits retain conflict copies. Older open clients
+cannot clear a retelling merely by omitting the new field.
+
+Open “排版与导出”, choose PDF, then “导出” and save through the browser print dialog.
+PDF uses a continuous A4 print layout rather than fixed-height poster sheets:
+long source sentences, notes and retellings can continue across pages. “包含原句出处”
+and “包含已填写的读后复述” default to on. Sources include stable paragraph references;
+edited examples are labelled separately. Empty retelling sections are omitted.
+PNG retains the three existing poster designs.

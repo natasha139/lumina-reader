@@ -81,3 +81,21 @@ test('edited learning content and trash state survive an actual shared-library r
   assert.deepEqual(linked.data.library.entries[0].notes, entry.notes);
   assert.equal(linked.data.library.entries[0].trashedAt, 42);
 });
+test('retell drafts survive the shared-library API and remain attached to their article', async () => {
+  const f = fixture(); const account = await f.get(A);
+  const entry = { ...legacyEntry({ article }), retell: { mainIdea: '主旨', argumentStructure: '证据与结论', englishRetell: 'My retelling.', transferExpressions: 'a useful phrase' } };
+  const library = { ...emptyLibrary(), entries: [entry], activeId: entry.id };
+  await f.post({ user_id: A, library, revision: 0 });
+  const linked = await f.post({ user_id: B, action: 'link', sync_code: account.data.sync_code });
+  assert.deepEqual(linked.data.library.entries[0].retell, entry.retell);
+});
+test('saving from an older open tab cannot erase retell fields it does not know about', async () => {
+  const f = fixture(); await f.get(A);
+  const entry = legacyEntry({ article });
+  const retell = { mainIdea: 'Keep my draft', argumentStructure: '', englishRetell: '', transferExpressions: '' };
+  await f.post({ user_id: A, library: { ...emptyLibrary(), entries: [{ ...entry, retell }] }, revision: 0 });
+  await f.post({ user_id: A, library: { ...emptyLibrary(), entries: [{ ...entry, status: 'completed' }] }, revision: 1 });
+  assert.equal((await f.get(A)).data.library.entries[0].retell.mainIdea, 'Keep my draft');
+  await f.post({ user_id: A, library: { ...emptyLibrary(), entries: [{ ...entry, retell: { ...retell, mainIdea: '' } }] }, revision: 2 });
+  assert.equal((await f.get(A)).data.library.entries[0].retell.mainIdea, '');
+});

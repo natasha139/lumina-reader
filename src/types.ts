@@ -57,3 +57,10 @@ export interface Note {
 export type AppMode = 'library' | 'input' | 'read' | 'layout';
 
 export type DesignStyle = 'academic' | 'editorial' | 'handwritten';
+
+export interface Retell {
+  mainIdea: string;
+  argumentStructure: string;
+  englishRetell: string;
+  transferExpressions: string;
+}

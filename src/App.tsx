@@ -42,13 +42,13 @@ export default function App() {
       onRestore={id => update(current => restoreLibraryEntry(current, id))}
       onImport={imported => update(current => mergeLibraries(emptyLibrary(), imported, current))}
       onSync={() => void sync()} onOpenSync={() => setShowSyncPanel(true)} syncStatus={status} syncMessage={message} storageError={storageError} />}
-    {mode !== 'library' && (message || storageError) && <div role="status" className="bg-amber-50 text-amber-800 text-sm p-3 text-center">
+    {mode !== 'library' && (message || storageError) && <div role="status" className="print:hidden bg-amber-50 text-amber-800 text-sm p-3 text-center">
       {storageError || message} <button className="underline ml-3" onClick={() => void sync()}>重试同步</button>
       <button className="underline ml-3" onClick={back}>返回书架备份</button>
     </div>}
     {mode === 'input' && <InputMode existingArticles={library.entries.filter(e => !e.trashedAt)} onOpenDuplicate={open} onStartReading={start} onBack={back} syncCode={syncCode} syncStatus={status} onOpenSyncPanel={() => setShowSyncPanel(true)} />}
     {(mode === 'read' || mode === 'layout') && entry && <>
-      <div className="sticky top-0 z-40 bg-cream max-w-5xl mx-auto px-5 py-3 flex justify-between items-center gap-3 text-sm">
+      <div className="print:hidden sticky top-0 z-40 bg-cream max-w-5xl mx-auto px-5 py-3 flex justify-between items-center gap-3 text-sm">
         <button onClick={back} className="text-gray-500 hover:text-ink">← 我的书架</button>
         <label className="flex gap-2 items-center text-gray-500">阅读状态
           <select aria-label="当前文章阅读状态" value={entry.status} onChange={e => patchEntry(entry.id, item => ({ ...item, status: e.target.value as ReadingStatus }))} className="bg-white border border-gray-200 rounded-lg px-3 py-2">
@@ -56,14 +56,14 @@ export default function App() {
           </select>
         </label>
       </div>
-      {mode === 'read' && <ReadMode key={entry.id} article={entry.article} vocabularies={entry.vocabularies} notes={entry.notes}
+      {mode === 'read' && <ReadMode retell={entry.retell} onRetellChange={retell => patchEntry(entry.id, e => ({ ...e, retell }))} key={entry.id} article={entry.article} vocabularies={entry.vocabularies} notes={entry.notes}
         onSaveVocabulary={(vocab, mergeId) => patchEntry(entry.id, e => ({ ...e, vocabularies: saveVocabulary(e.vocabularies, vocab, mergeId) }))}
         onSaveNote={note => patchEntry(entry.id, e => ({ ...e, notes: e.notes.some(n => n.id === note.id) ? e.notes.map(n => n.id === note.id ? note : n) : [...e.notes, note] }))}
         onDeleteNote={id => patchEntry(entry.id, e => ({ ...e, notes: e.notes.filter(n => n.id !== id) }))}
         onDeleteVocabulary={id => patchEntry(entry.id, e => ({ ...e, vocabularies: e.vocabularies.filter(v => v.id !== id) }))}
         onUpdateArticle={updateArticle} onGoToLayout={() => { setMode('layout'); window.scrollTo(0, 0); }} onBack={back}
         progress={entry.progress} onProgress={progress} syncStatus={status} onOpenSyncPanel={() => setShowSyncPanel(true)} />}
-      {mode === 'layout' && <Suspense fallback={<p role="status" className="p-10 text-center text-gray-500">正在打开排版预览…</p>}><LayoutMode key={entry.id} article={entry.article} vocabularies={entry.vocabularies} notes={entry.notes} onUpdateArticle={updateArticle} onBack={() => setMode('read')} /></Suspense>}
+      {mode === 'layout' && <Suspense fallback={<p role="status" className="p-10 text-center text-gray-500">正在打开排版预览…</p>}><LayoutMode retell={entry.retell} key={entry.id} article={entry.article} vocabularies={entry.vocabularies} notes={entry.notes} onUpdateArticle={updateArticle} onBack={() => setMode('read')} /></Suspense>}
     </>}
     {showSyncPanel && <SyncPanel syncCode={syncCode} onLinkDevice={linkDevice} onClose={() => setShowSyncPanel(false)} />}
   </div>;

@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { Article, Vocabulary, Note, DesignStyle } from '../types';
+import { Article, Vocabulary, Note, Retell, DesignStyle } from '../types';
+import PrintableReading from './PrintableReading';
 import html2canvas from 'html2canvas';
 import { getParagraphs, withParagraphs } from '../lib/library';
 import { Download, ArrowLeft, Loader2, Bold, Italic, Underline, Highlighter, Eraser, GraduationCap, Newspaper, PenTool } from 'lucide-react';
@@ -65,6 +66,7 @@ interface LayoutModeProps {
   article: Article;
   vocabularies: Vocabulary[];
   notes: Note[];
+  retell?: Retell;
   onUpdateArticle?: (article: Article) => void;
   onBack: () => void;
 }
@@ -76,10 +78,12 @@ interface PageData {
   notes: Note[];
 }
 
-export default function LayoutMode({ article, vocabularies, notes, onUpdateArticle, onBack }: LayoutModeProps) {
+export default function LayoutMode({ article, vocabularies, notes, retell, onUpdateArticle, onBack }: LayoutModeProps) {
   const layoutRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<'png' | 'pdf'>('pdf');
+  const [includeSources, setIncludeSources] = useState(true);
+  const [includeRetell, setIncludeRetell] = useState(true);
   const [showIframeWarning, setShowIframeWarning] = useState(false);
   const [designStyle, setDesignStyle] = useState<DesignStyle>('academic');
 
@@ -171,22 +175,11 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
   const handleExport = async () => {
     if (exportFormat === 'pdf') {
       if (window !== window.parent) { setShowIframeWarning(true); return; }
-      const style = document.createElement('style');
-      style.innerHTML = `
-        @page { size: A4; margin: 0; }
-        @media print {
-          html, body { width: 210mm !important; margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white !important; }
-          body > *:not(#root) { display: none !important; }
-          .print\\:hidden { display: none !important; }
-          #root { width: 210mm !important; }
-          .a4-page { width: 210mm !important; height: 297mm !important; margin: 0 !important; padding: 15mm !important; box-shadow: none !important; page-break-after: always !important; break-after: page !important; }
-          .a4-page:last-child { page-break-after: auto !important; break-after: auto !important; }
-        }
-      `;
-      document.head.appendChild(style);
-      window.getComputedStyle(document.body).getPropertyValue('display');
-      window.print();
-      setTimeout(() => { if (document.head.contains(style)) document.head.removeChild(style); }, 2000);
+      setIsExporting(true);
+      try {
+        await document.fonts.ready;
+        window.print();
+      } finally { setIsExporting(false); }
       return;
     }
     if (!layoutRef.current) return;
@@ -556,7 +549,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
   ];
 
   return (
-    <div className="min-h-screen bg-gray-200 p-4 md:p-12 pb-32 print:p-0 print:m-0 print:bg-white flex flex-col items-center">
+    <div className="print-layout min-h-screen bg-gray-200 p-4 md:p-12 pb-32 print:p-0 print:m-0 print:bg-white flex flex-col items-center">
       {/* Floating Rich Text Toolbar */}
       {selectionRect && (
         <div
@@ -610,6 +603,7 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
           {/* Export Controls */}
           <div className="flex items-center gap-2 p-2 bg-white rounded-lg shadow-sm">
             <select
+              aria-label="导出格式"
               value={exportFormat}
               onChange={(e) => setExportFormat(e.target.value as 'png' | 'pdf')}
               className="bg-transparent font-sans font-bold text-sm text-gray-900 outline-none cursor-pointer"
@@ -630,6 +624,14 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
         </div>
       </div>
 
+      {exportFormat === 'pdf' && <div className="w-full max-w-[210mm] mb-6 print:hidden text-sm text-gray-600">
+        <div className="flex flex-wrap gap-5 mb-3">
+          <label className="flex items-center gap-2"><input type="checkbox" checked={includeSources} onChange={e => setIncludeSources(e.target.checked)} />包含原句出处</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={includeRetell} onChange={e => setIncludeRetell(e.target.checked)} />包含已填写的读后复述</label>
+        </div>
+        <p className="text-xs text-gray-500 leading-relaxed">PDF 会完整保留长句并自动分页。点击导出后，选择“另存为 PDF”；编辑内容请返回阅读。</p>
+      </div>}
+
       {/* Iframe Warning Modal */}
       {showIframeWarning && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm print:hidden">
@@ -646,10 +648,10 @@ export default function LayoutMode({ article, vocabularies, notes, onUpdateArtic
       )}
 
       {/* Multi-Page Container */}
-      <div ref={layoutRef} className="flex flex-col gap-8 print:gap-0 print:block">
+      {exportFormat === 'pdf' ? <div className="pdf-preview-frame w-full max-w-[210mm] overflow-x-auto print:overflow-visible"><PrintableReading article={article} vocabularies={vocabularies} notes={notes} retell={retell} includeSources={includeSources} includeRetell={includeRetell} designStyle={designStyle} /></div> : <div ref={layoutRef} className="flex flex-col gap-8 print:gap-0 print:block">
         {pages.map(renderPage)}
         {designStyle === 'academic' && renderWorksheet()}
-      </div>
+      </div>}
     </div>
   );
 }

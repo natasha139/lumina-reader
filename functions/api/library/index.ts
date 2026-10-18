@@ -108,8 +108,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     if (library.entries.length !== body.library.entries.length || new Set(library.entries.map(e => e.id)).size !== library.entries.length)
       return json({ error: '文章库中含有无效或重复文章' }, 400);
     const current = await ensureLibrary(db, body.user_id);
+    // Older open tabs do not know about retell. Omission must not erase a
+    // newer device's draft; an explicit empty retell object still clears it.
+    const previous = normalizeLibrary(JSON.parse(current.library_json));
+    const storedLibrary: ReadingLibrary = { ...library, entries: library.entries.map(entry => {
+      const old = previous.entries.find(item => item.id === entry.id);
+      return entry.retell === undefined && old?.retell ? { ...entry, retell: old.retell } : entry;
+    }) };
     const saved = await db.prepare(`UPDATE reading_libraries SET library_json = ?, revision = revision + 1 WHERE id = ? AND revision = ?`)
-      .bind(JSON.stringify(library), current.id, body.revision).run();
+      .bind(JSON.stringify(storedLibrary), current.id, body.revision).run();
     if (!saved.meta.changes) {
       return json({ ...result((await byDevice(db, body.user_id))!), conflict: true }, 409);
     }
