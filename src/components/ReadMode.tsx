@@ -161,6 +161,8 @@ export default function ReadMode({
   const [showStudentPicker, setShowStudentPicker] = useState(false);
   const [students, setStudents] = useState<{ id: number; name: string }[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [encounterKey, setEncounterKey] = useState('');
+  const [encounterError, setEncounterError] = useState('');
   const [pushing, setPushing] = useState('');
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -256,26 +258,29 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
       return;
     }
     setShowExportMenu(false);
-    setLoadingStudents(true);
+    setEncounterError('');
     setShowStudentPicker(true);
+    if (encounterKey) await loadEncounterStudents();
+  };
+
+  const loadEncounterStudents = async () => {
+    if (!encounterKey.trim()) { setEncounterError('请填写 Encounter 密钥'); return; }
+    setLoadingStudents(true); setStudents([]); setEncounterError('');
     try {
-      const res = await fetch(`${API.ENCOUNTER}/api/students`);
+      const res = await fetch('/api/encounter/students', {headers:{'X-Admin-Key':encounterKey.trim()}});
       const data = await res.json();
-      setStudents(data.students || []);
-    } catch {
-      showToast('获取学生列表失败', 'error');
-      setShowStudentPicker(false);
-    } finally {
-      setLoadingStudents(false);
-    }
+      if (!res.ok || data.error || !Array.isArray(data.students)) throw new Error(data.error || '学生列表格式异常');
+      setStudents(data.students);
+    } catch (error) { setEncounterError(error instanceof Error ? error.message : '学生列表加载失败'); }
+    finally { setLoadingStudents(false); }
   };
 
   const handleSelectStudent = async (studentId: number) => {
     setPushing('encounter');
     try {
-      const res = await fetch(`${API.ENCOUNTER}/api/words/add-batch`, {
+      const res = await fetch('/api/encounter/words', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Key': encounterKey.trim() },
         body: JSON.stringify({
           student_id: studentId,
           words: vocabularies.map(v => ({
@@ -291,14 +296,15 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
           })),
         }),
       });
-      if (!res.ok) throw new Error('Failed');
       const result = await res.json();
-      showToast(`已推送 ${result.added || vocabularies.length} 个生词`);
-    } catch {
-      showToast('推送失败，请重试', 'error');
+      if (!res.ok || result.error) throw new Error(result.error || '推送失败');
+      if (typeof result.added !== 'number') throw new Error('推送结果格式异常');
+      showToast(`新增 ${result.added} 个生词，跳过 ${typeof result.skipped === 'number' ? result.skipped : 0} 个`);
+      setShowStudentPicker(false);
+    } catch (error) {
+      setEncounterError(error instanceof Error ? error.message : '推送失败，请重试');
     } finally {
       setPushing('');
-      setShowStudentPicker(false);
     }
   };
 
@@ -633,18 +639,25 @@ ${article.subtitle ? `<h2 style="font-size:18px;color:#666;margin-top:12px;">${a
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-80 max-h-[60vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-gray-100">
-              <h3 className="font-bold text-sm">选择学生</h3>
+              <h3 className="font-bold text-sm">推送到 Encounter</h3>
               <button onClick={() => setShowStudentPicker(false)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
+            <form className="p-4 border-b border-gray-100 text-sm" onSubmit={e => {e.preventDefault();loadEncounterStudents();}}>
+              <label htmlFor="encounter-key">Encounter 密钥</label>
+              <input id="encounter-key" type="password" autoComplete="off" className="w-full border rounded p-2 mt-1" value={encounterKey} onChange={e => {setEncounterKey(e.target.value);setStudents([]);}} disabled={loadingStudents || pushing === 'encounter'} />
+              <p className="text-xs text-gray-500 my-2">仅用于本次连接，不保存到文章或浏览器存储。</p>
+              <button type="submit" className="underline" disabled={loadingStudents || pushing === 'encounter'}>加载 / 刷新学生列表</button>
+              {encounterError && <p role="alert" className="text-red-600 mt-2">{encounterError}</p>}
+            </form>
             <div className="flex-1 overflow-y-auto p-2">
               {loadingStudents ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
                 </div>
               ) : students.length === 0 ? (
-                <div className="text-center py-8 text-sm text-gray-400">没有找到学生</div>
+                <div className="text-center py-8 text-sm text-gray-400">{encounterError ? '请修正上方问题后重试' : '加载列表后选择要接收生词的学生'}</div>
               ) : (
                 students.map(s => (
                   <button
